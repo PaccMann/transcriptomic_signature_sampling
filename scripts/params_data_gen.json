@@ -1,0 +1,10 @@
+{
+    "reference_data": "<insert-path-here>",
+    "reference_labels": "<insert-path-here>",
+    "test_data": "<insert-path-here>",
+    "test_labels": "<insert-path-here>",
+    "colotype_path": "<insert-path-here>",
+    "sampling": "crossover_local",
+    "class_size": "500",
+    "sampling_strategy": "auto"
+}
