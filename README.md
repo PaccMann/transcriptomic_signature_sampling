@@ -1,4 +1,4 @@
-# signature_sampling
+# transcriptomic_signature_sampling
 Signature Informed Sampling for Transcriptomic Data.
 
 
