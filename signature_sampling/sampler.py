@@ -1,3 +1,4 @@
+import math
 import random
 from collections import Counter
 from typing import Iterable, List, Tuple, Union
@@ -45,7 +46,7 @@ class Sampler:
         return grouped_indices
 
     def poisson_local_mean(
-        self, X: pd.DataFrame, length: int, cms: str
+        self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
         """Poisson sampling strategy for RNA-Seq data representing a phenotype (here, cms).
 
@@ -54,7 +55,7 @@ class Sampler:
             given phenotype.
             Indices are patient ID and columns represent genes.
             length (int): Number of samples to generate.
-            cms (str): CMS type being augmented. Used only for creating a unique
+            target_class (str): target class being augmented. Used only for creating a unique
             patient ID.
 
         Returns:
@@ -62,7 +63,11 @@ class Sampler:
             distribution with the specified "cms" label.
         """
         samples = []
-        ref_indices = self.random_combinations(X.index, r=10, length=length)
+        project = X.index[0].split("-")[0]
+        r_set_size = kwargs.get("poisson_r", 10)
+        ref_indices = self.random_combinations(
+            X.index, subset_size=r_set_size, length=length
+        )
         for i in range(length):
             mean = X.iloc[ref_indices[i], :].mean().values
             poisson = list(map(td.Poisson, mean))
@@ -70,12 +75,12 @@ class Sampler:
 
         return pd.DataFrame(
             samples,
-            index=[f"TCGA-{cms}-{i}S" for i in range(length)],
+            index=[f"{project}-{target_class}-S{i}" for i in range(length)],
             columns=X.columns,
         )
 
     def gamma_poisson_sampler(
-        self, X: pd.DataFrame, length: int, cms: str
+        self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
         """Gamma-Poisson (Negative Binomial) sampling strategy for RNA-Seq data
         representing a phenotype (here, cms).
@@ -85,7 +90,7 @@ class Sampler:
             given phenotype.
             Indices are patient ID and columns represent genes.
             length (int): Number of samples to generate.
-            cms (str): CMS type being augmented. Used only for creating a unique
+            target_class (str): target class being augmented. Used only for creating a unique
             patient ID.
 
         Returns:
@@ -113,7 +118,11 @@ class Sampler:
             return mu
 
         samples = []
-        ref_indices = self.random_combinations(X.index, r=5, length=length)
+        project = X.index[0].split("-")[0]
+        r_set_size = kwargs.get("gamma_poisson_r", 5)
+        ref_indices = self.random_combinations(
+            X.index, subset_size=r_set_size, length=length
+        )
 
         for i in range(length):
             mean = X.iloc[ref_indices[i], :].mean().values
@@ -124,11 +133,13 @@ class Sampler:
 
         return pd.DataFrame(
             samples,
-            index=[f"TCGA-{cms}-{i}S" for i in range(length)],
+            index=[f"{project}-{target_class}-S{i}" for i in range(length)],
             columns=X.columns,
         )
 
-    def replacement_sampler(self, X: pd.DataFrame, length: int) -> pd.DataFrame:
+    def replacement_sampler(
+        self, X: pd.DataFrame, length: int, target: str
+    ) -> pd.DataFrame:
         """Random oversampling method.
 
         Args:
@@ -136,6 +147,9 @@ class Sampler:
             given phenotype.
             Indices are patient ID and columns represent genes.
             length (int): Number of samples to generate.
+            target (str): The name of the target labels, i.e, column name used in the
+                dataframe for the targets. For example, 'cms', 'cimp', 'tStage', etc.
+                Redundant for this function.
 
         Returns:
             pd.DataFrame: Dataframe of only newly generated samples resampled from the
@@ -143,11 +157,11 @@ class Sampler:
         """
         random_idx = np.random.randint(0, len(X), size=length)
         ref_sample = X.iloc[random_idx, :]
-        ref_sample.index = ref_sample.index + "S"
+        ref_sample.index = ref_sample.index + [f"S{i}" for i in range(length)]
         return ref_sample
 
     def smote_sampler(
-        self, X: pd.DataFrame, y: pd.DataFrame, sampling_strategy: dict
+        self, X: pd.DataFrame, y: pd.DataFrame, target: str, sampling_strategy: dict
     ) -> Tuple:
         """Synthetic Minority Oversampling Technique.
 
@@ -155,6 +169,8 @@ class Sampler:
             X (pd.DataFrame): The entire dataset of RNA-Seq values (not restricted to a
             given phenotype) from which sampling should be done.
             y (pd.DataFrame): Target labels associated with the patients in X.
+            target (str): The name of the target labels, i.e, column name used in the
+                dataframe for the targets. For example, 'cms', 'cimp', 'tStage', etc.
             sampling_strategy (dict): Argument passed to the smote method from the
             imblearn package.
             In this function, it is a dictionary with keys = cms types,
@@ -185,10 +201,16 @@ class Sampler:
         synthetic_samples = pd.concat([resampled_df, data_labels]).drop_duplicates(
             keep=False
         )
-        synthetic_samples.index = synthetic_samples.index + "S"
-        synthetic_labels = pd.DataFrame(synthetic_samples["cms"])
+        synthetic_samples["index"] = synthetic_samples.index
+        synthetic_samples.index = (
+            synthetic_samples.index
+            + "S"
+            + synthetic_samples.groupby("index").cumcount().astype(str)
+        )
 
-        synthetic_samples = synthetic_samples.drop(columns="cms")
+        synthetic_labels = pd.DataFrame(synthetic_samples[target])
+
+        synthetic_samples = synthetic_samples.drop(columns=[target, "index"])
 
         # merged_df = pd.concat([X, synthetic_samples])
         # synthetic_labels
@@ -202,8 +224,9 @@ class Sampler:
         self,
         X: pd.DataFrame,
         y: pd.DataFrame,
-        cms_size: Union[int, list, dict],
-        colotype_genes: pd.DataFrame,
+        target: str,
+        target_size: Union[int, list, dict],
+        target_signatures: dict,
     ) -> Tuple:
 
         """Inter-Class Crossover sampling method. Sampling inspired by chromosomal
@@ -215,83 +238,78 @@ class Sampler:
             X (pd.DataFrame): The entire dataset of RNA-Seq values (not restricted to a
             given phenotype) from which sampling should be done.
             y (pd.DataFrame): Target labels associated with the patients in X.
-            cms_size (Union[int, list, dict]): Desired size of each CMS type. The same
-            size applies to all CMS types if an integer is provided.
-            If a list is provided, ensure that the values correspond to the sorted CMS
-            types,i.e, CMS1,CMS2,CMS3,CMS4.
-            colotype_genes (pd.DataFrame): Dataframe of predictive/signature genes and
-            the phenotype each gene is associated with.
+            target (str): The name of the target labels, i.e, column name used in the
+                dataframe for the targets. For example, 'cms', 'cimp', 'tStage', etc.
+            target_size (Union[int, list, dict]): Desired size of each target class. The same
+            size applies to all target classes if an integer is provided.
+            If a list is provided, ensure that the values correspond to the sorted target classes.
+            Eg, for CMS types, it should be CMS1,CMS2,CMS3,CMS4.
+            target_signatures (dict): Dictionary of signatures associated with each target class.
+                Keys must be the target class (phenotype), and values the genes associated with it.
 
         Returns:
             Tuple: Tuple containing a dataframe of only the newly generated samples and
             a second dataframe of the associated target labels.
         """
 
-        target_count = dict(Counter(y["cms"]))
+        target_count = dict(Counter(y[target]))
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
 
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
         max_count = sorted_count[-1][1]
 
-        if any("ENS" in x for x in X.columns):
-            gene_type = "ensemblid"
-        else:
-            gene_type = "SYMBOL"
-
-        cms_genes = dict(
-            colotype_genes.groupby("subtype").apply(lambda x: x[gene_type].values)
-        )
-
-        df = X.join(y)
-        ref_df = df.sort_values(by="cms")
-        cms_ids_all = ref_df.index
-        cms_ids = {k: ref_df[ref_df["cms"] == k].index for k in np.unique(y)}
-        cms_list = list(cms_ids.keys())
-        sampling_idx = pd.DataFrame(columns=cms_list)
-        sampled_labels = pd.DataFrame(columns=["cms"])
+        df = X.join(y[target])
+        ref_df = df.sort_values(by=target)
+        target_ids_all = ref_df.index
+        target_ids = {
+            k: ref_df[ref_df[target] == k].index for k in np.unique(y[target])
+        }
+        target_list = list(target_ids.keys())
+        sampling_idx = pd.DataFrame(columns=target_list)
+        sampled_labels = pd.DataFrame(columns=[target])
         row_idx = []
         sampled_df_list = []
 
-        if isinstance(cms_size, int):
-            cms_size_dict = dict.fromkeys(cms_list, cms_size)
-        elif isinstance(cms_size, list):
-            cms_key_values = list(zip(cms_list, cms_size))
-            cms_size_dict = dict(cms_key_values)
-        elif isinstance(cms_size, dict):
-            cms_size_dict = cms_size
+        if isinstance(target_size, int):
+            target_size_dict = dict.fromkeys(target_list, target_size)
+        elif isinstance(target_size, list):
+            cms_key_values = list(zip(target_list, target_size))
+            target_size_dict = dict(cms_key_values)
+        elif isinstance(target_size, dict):
+            target_size_dict = target_size
 
         # NOTE: doing this row wise per cms-block, so we sample all indices for cms1
         size_list = []  # - to keep track of cms sizes for indexing in new augmented df
-        for cms in cms_list:
+        for item in target_list:
 
             row_idx = []
 
             size = (
-                max_count - target_count[cms]
-                if cms_size is None
-                else cms_size_dict[cms]
+                max_count - target_count[item]
+                if target_size is None
+                else target_size_dict[item]
                 - target_count[
-                    cms
+                    item
                 ]  # remove "- target_count[cms]" if you want to sample specified cms_size samples
             )
             size_list.append(size)
             if size == 0:
                 continue
 
-            for cms_ in cms_list:
-                if cms == cms_:
-                    target_cms = np.random.choice(cms_ids[cms], size=size)
-                    row_idx.append(target_cms.tolist())
+            for subitem in target_list:
+                if item == subitem:
+                    target_class = np.random.choice(target_ids[item], size=size)
+                    row_idx.append(target_class.tolist())
 
                 else:
                     fragment = np.random.choice(
-                        np.setdiff1d(cms_ids_all, cms_ids[cms_]), size
+                        np.setdiff1d(target_ids_all, target_ids[subitem]), size
                     )
                     row_idx.append(fragment.tolist())
 
-            sampled_cms = pd.DataFrame(row_idx, index=cms_list).T
+            sampled_cms = pd.DataFrame(row_idx, index=target_list).T
             sampling_idx = pd.concat([sampling_idx, sampled_cms])
-            new_labels = pd.DataFrame({"cms": [cms] * size})
+            new_labels = pd.DataFrame({target: [item] * size})
             sampled_labels = pd.concat([sampled_labels, new_labels])
 
         sampling_idx = sampling_idx.reset_index(drop=True)
@@ -299,13 +317,13 @@ class Sampler:
 
         ref_sample_index = []
 
-        for i, cms in enumerate(cms_list):
+        for i, item in enumerate(target_list):
             j = 0
-            assert sum(sampling_idx[cms].isin(cms_ids[cms])) == size_list[i]
+            assert sum(sampling_idx[item].isin(target_ids[item])) == size_list[i]
             if size_list[i] == 0:
                 continue
             sample_indices = sampling_idx.loc[
-                size_list[i] * j : (size_list[i] * (j + 1)) - 1, cms
+                size_list[i] * j : (size_list[i] * (j + 1)) - 1, item
             ]
             if sample_indices.dtype == int:
                 sample_indices = sample_indices.astype(str)
@@ -315,7 +333,7 @@ class Sampler:
             ref_sample_index.append(sample_indices)
             j += 1
 
-        for k, v in cms_genes.items():
+        for k, v in target_signatures.items():
             sampled_df_list.append(
                 ref_df.loc[sampling_idx.loc[:, k].values, v].reset_index()
             )
@@ -334,9 +352,14 @@ class Sampler:
         return sampled_df, sampled_labels
 
     def crossover_sampler_local(
-        self, X: pd.DataFrame, length: int, cms: str, colotype_genes: pd.DataFrame
+        self,
+        X: pd.DataFrame,
+        length: int,
+        target: str,
+        target_class: str,
+        target_signatures: dict,
     ) -> pd.DataFrame:
-        """Intra-Class Crossover sampling method. Sampling inspired by chromosmal
+        """Intra-Class Crossover sampling method. Sampling inspired by chromosomal
         crossing over where there is a "crossover" between samples at the gene signature
         level (associated with different CMS types). Local version where a subset of a
         given class is passed and the intermixing takes place only between samples of
@@ -345,37 +368,30 @@ class Sampler:
             X (pd.DataFrame): Dataframe containing RNA-Seq values for patients of a
             given phenotype.
             length (int): Number of samples to generate.
-            cms (str): CMS type being augmented. Used only for creating a unique
+            target (str): The name of the target labels, i.e, column name used in the
+                dataframe for the targets. For example, 'cms', 'cimp', 'tStage', etc.
+            target_class (str): target class being augmented. Used only for creating a unique
             patient ID.
-            colotype_genes (pd.DataFrame): Dataframe of predictive/signature genes and
-            the phenotype each gene is associated with.
+            target_signatures (dict): Dictionary of signatures associated with each target class.
+                Keys must be the target class (phenotype), and values the genes associated with it.
 
         Returns:
             pd.DataFrame: Dataframe of only newly generated samples from the given
             dataframe X.
         """
-        # check if X has gene name or ensembl id
-        if any("ENS" in x for x in X.columns):
-            gene_type = "ensemblid"
-        else:
-            gene_type = "SYMBOL"
 
-        cms_genes = dict(
-            colotype_genes.groupby("subtype").apply(lambda x: x[gene_type].values)
-        )
-        # here subset is set of all samples of a given class type
-        cms_list = ["CMS1", "CMS2", "CMS3", "CMS4"]
+        target_list = sorted(list(target_signatures.keys()))
 
-        sampling_idx = np.random.randint(0, len(X), size=(length, 4))
-        sampling_idx = pd.DataFrame(sampling_idx, columns=cms_list)
+        sampling_idx = np.random.randint(0, len(X), size=(length, len(target_list)))
+        sampling_idx = pd.DataFrame(sampling_idx, columns=target_list)
         sampled_df_list = []
 
-        ref_sample_index = X.index[sampling_idx[cms]]
+        ref_sample_index = X.index[sampling_idx[target_class]]
         if ref_sample_index.dtype == int:
             ref_sample_index = ref_sample_index.astype(str)
         ref_sample_index = ref_sample_index + "S"
 
-        for k, v in cms_genes.items():
+        for k, v in target_signatures.items():
             idx = X.index[sampling_idx.loc[:, k]]
             sampled_df_list.append(X.loc[idx, v].reset_index())
 
@@ -391,6 +407,7 @@ class Sampler:
         self,
         X: pd.DataFrame,
         y: pd.DataFrame,
+        target: str,
         dset_size: int,
         sampling_method: str = "gamma_poisson",
         **kwargs,
@@ -399,8 +416,10 @@ class Sampler:
 
         Args:
             X (pd.DataFrame): Dataframe of transcriptomic data to be augmented.
-            y (pd.DataFrame): Array of target labels associated with the transcriptomic
+            y (pd.DataFrame): Dataframe of target labels associated with the transcriptomic
             data.
+            target (str): The name of the target labels, i.e, column name used in the
+                dataframe for the targets. For example, 'cms', 'cimp', 'tStage', etc.
             dset_size (int): Desired size of each phenotype class. Same size applies
             to all classes.
             type (str, optional): Type of sampling to perform.
@@ -411,7 +430,7 @@ class Sampler:
             Tuple: Tuple containing a dataframe of only the newly generated samples and
             a second dataframe of the associated target labels.
         """
-        target_count = dict(Counter(y["cms"]))
+        target_count = dict(Counter(y[target]))
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
         # max_label_count = max(target_count.items(),key=lambda k: k[1])
         max_count = sorted_count[-1][1]
@@ -420,27 +439,33 @@ class Sampler:
         sampled_labels = pd.DataFrame()
 
         for k, v in sorted_count:
-            if k == "NOLBL":
+            if k in ["NOLBL", math.nan]:
                 continue
-            subset_idx = np.argwhere(y["cms"].values == k).flatten()
+            subset_idx = np.argwhere(y[target].values == k).flatten()
             subset = X.iloc[subset_idx, :]
             size = max_count - v if dset_size is None else dset_size - v
             # size = max_count - v if dset_size is None else dset_size # if you want to sample specified dset_size samples
 
             if sampling_method == "crossover_local":
                 new_samples = self.get_samples[sampling_method](
-                    subset, size, k, kwargs["colotype_genes"]
+                    subset, size, target, k, kwargs["target_signatures"]
                 )
                 new_samples = new_samples.loc[:, X.columns]
 
             elif sampling_method in ["gamma_poisson", "poisson_local"]:
                 new_samples = self.get_samples[sampling_method](subset, size, k)
+
+            elif sampling_method in ["smote", "replacement"]:
+                new_samples = self.get_samples[sampling_method](
+                    subset, size, target, **kwargs
+                )
+
             else:
-                new_samples = self.get_samples[sampling_method](subset, size, **kwargs)
+                raise NotImplementedError("Sampling method unavailable.")
 
-            new_labels = pd.DataFrame({"cms": [k] * size}, index=new_samples.index)
+            new_labels = pd.DataFrame({target: [k] * size}, index=new_samples.index)
 
-            sampled_df = sampled_df.append(new_samples)
-            sampled_labels = sampled_labels.append(new_labels)
+            sampled_df = pd.concat([sampled_df, new_samples])
+            sampled_labels = pd.concat([sampled_labels, new_labels])
 
         return sampled_df, sampled_labels
