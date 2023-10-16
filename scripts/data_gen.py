@@ -18,7 +18,7 @@ parser.add_argument(
 parser.add_argument(
     "probemap_path",
     type=str,
-    help="Path to the probemap file containing information about gene lengths",
+    help="Path to the probemap file containing information about gene lengths. Found in the data link provided.",
 )
 parser.add_argument(
     "save_path", type=str, help="Path where the data files should be saved."
@@ -30,7 +30,6 @@ def main(
     probemap_path: str,
     save_dir: str,
 ):
-
     with open(params_path, "r") as f:
         params = json.load(f)
 
@@ -89,7 +88,6 @@ def main(
         )
 
     elif "crossover_global" in sampling:
-
         sampled_df, sampled_labels = sampler_obj.crossover_sampler_global(
             ref_df, ref_labels, target, class_size, signature_genes
         )
@@ -98,7 +96,6 @@ def main(
         augmented_labels = pd.concat([ref_labels, sampled_labels])
 
     else:
-
         sampled_df, sampled_labels = sampler_obj.subset_sampler(
             ref_df,
             ref_labels,
