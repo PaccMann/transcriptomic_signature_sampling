@@ -1,0 +1,30 @@
+{
+    "xtrain": "train_logfpkm_colotype_stdz.csv",
+    "ytrain": "train_labels_logfpkm_colotype.csv",
+    "xtest": "test_logfpkm_colotype_stdz.csv",
+    "ytest": "test_labels_logfpkm_colotype.csv",
+    "xval": "valid_logfpkm_colotype_stdz.csv",
+    "yval": "valid_labels_logfpkm_colotype.csv",
+    "ae_type": "vae",
+    "input_size": 40,
+    "fc_layers": 1,
+    "fc_units": [
+        20
+    ],
+    "fc_activation": [
+        "relu",
+        "None"
+    ],
+    "latent_size": 4,
+    "batch_size": 64,
+    "lr": 0.001,
+    "l2_weight": 0.0001,
+    "epochs": 300,
+    "prior": "normal",
+    "prior_params": {
+        "loc": 0.0,
+        "scale": 1.0
+    },
+    "q_sampler": "normal",
+    "early_stopping_wait": 8
+}
