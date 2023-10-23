@@ -54,7 +54,6 @@ def main(
     seed: int,
     repeat_id: str,
 ):
-
     torch.manual_seed(seed)
     np.random.seed(seed)
 
@@ -118,7 +117,6 @@ def main(
         val_labels = []
 
         for x, y, _ in train_loader:
-
             if ae_type == "vae":
                 x_recon, z_train, q_z, p_z = model(x.to(device))
                 loss_train = model.loss(x_recon, x, q_z, p_z)
@@ -215,16 +213,6 @@ def main(
     torch.save(train_loss, os.path.join(results_dir, "results", "train_loss"))
     torch.save(val_loss, os.path.join(results_dir, "results", "avg_valid_loss"))
 
-    knn = KNeighborsClassifier()
-    train_preds = knn.fit(np.concatenate(latent_train), np.concatenate(train_labels))
-    train_preds = knn.predict(np.concatenate(latent_train))
-    train_cluster_purity = purity_score(np.concatenate(train_labels), train_preds)
-
-    knn = KNeighborsClassifier()
-    val_preds = knn.fit(np.concatenate(latent_val), np.concatenate(val_labels))
-    val_preds = knn.predict(np.concatenate(latent_val))
-    val_cluster_purity = purity_score(np.concatenate(val_labels), val_preds)
-
     clrs = sns.color_palette("Set2", 2)
     fig, ax = plt.subplots(constrained_layout=True)
     fig.suptitle(f"Train and Validation Loss of {model_name}")
@@ -242,7 +230,6 @@ def main(
     test_input = []
     best_model.eval()
     for x, y, _ in test_loader:
-
         x_recon, z, q_z, p_z = best_model(x.to(device))
         loss = best_model.loss(x_recon, x, q_z, p_z)
 
@@ -263,11 +250,6 @@ def main(
     test_latent = torch.cat(test_latent)
     test_labels = torch.cat(test_labels)
 
-    knn = KNeighborsClassifier()
-    test_preds = knn.fit(test_latent, test_labels)
-    test_preds = knn.predict(test_latent)
-    cluster_purity = purity_score(test_labels, test_preds)
-
     logger.info("Test Info: {}".format({k: np.mean(v) for k, v in loss_dict.items()}))
     test_input_silhoutte = metrics.silhouette_score(test_input, test_labels)
     test_recon_silhoutte = metrics.silhouette_score(test_recon, test_labels)
@@ -277,9 +259,6 @@ def main(
             "test_input_silhoutte": float(test_input_silhoutte),
             "test_recon_silhoutte": float(test_recon_silhoutte),
             "test_latent_silhoutte": float(test_latent_silhoutte),
-            "test_latent_purity": float(cluster_purity),
-            "train_cluster_purity": float(train_cluster_purity),
-            "val_cluster_purity": float(val_cluster_purity),
         }
     )
 
