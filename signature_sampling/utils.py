@@ -1,9 +1,12 @@
 import os
+import json
 import numpy as np
 import pandas as pd
 from scipy.stats import wilcoxon
-from typing import Iterable, Dict, Tuple
+from typing import Iterable, Dict, Tuple, Callable
 from sklearn import metrics
+import torch
+from signature_sampling.vae import VAE
 
 
 def fpkm(
@@ -119,3 +122,41 @@ def significance_testing(
                     cptac_w_df.loc[sampling, comparison] = w_cptac
 
     return w_df, cptac_w_df
+
+
+def load_model(model_name: str, model_path: str):
+    saved_model_params_path = os.path.join(model_path, "params.json")
+    saved_model = os.path.join(model_path, "weights")
+
+    with open(saved_model_params_path, "r") as readjson:
+        saved_model_params = json.load(readjson)
+
+    model = VAE(saved_model_params)
+
+    state_dict_enc = torch.load(
+        os.path.join(saved_model, model_name), map_location=torch.device("cpu")
+    )["model_state_dict"]
+    for key in list(state_dict_enc.keys()):
+        state_dict_enc[key.replace("0.0.", "0.")] = state_dict_enc.pop(key)
+
+    model.load_state_dict(state_dict_enc)
+
+    return model
+
+
+def get_latent_embeddings(
+    model: Callable,
+    input_data: torch.Tensor,
+    results_dir: str,
+    filename: str,
+) -> torch.Tensor:
+    os.makedirs(results_dir, exist_ok=True)
+
+    model.eval()
+
+    z_mean, z_logvar = model.encoder(input_data)
+    latent_embed, q_z, p_z = model.reparameterise(z_mean, z_logvar)
+
+    torch.save(latent_embed, os.path.join(results_dir, filename))
+
+    return latent_embed
