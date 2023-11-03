@@ -1,30 +1,15 @@
-import numpy as np
-from numpy.typing import ArrayLike
 import random
-from typing import Iterable, Tuple, Callable, Dict
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 from matplotlib.colors import Colormap
-from sklearn.cluster import KMeans, SpectralClustering, AgglomerativeClustering
-from sklearn import metrics, mixture
-
-
-CLUSTERING_METHOD_FACTORY = {
-    "kmeans": KMeans,
-    "spectral": SpectralClustering,
-    "heirarchical": AgglomerativeClustering,
-}
-
-CLUSTERING_METRIC_FACTORY = {
-    "silhoutte_avg": metrics.silhouette_score,
-    "silhoutte_sample": metrics.silhouette_samples,
-    "ari": metrics.adjusted_rand_score,
-    "ami": metrics.adjusted_mutual_info_score,
-    "nmi": metrics.normalized_mutual_info_score,
-    "homogeneity": metrics.homogeneity_score,
-    "completeness": metrics.completeness_score,
-    "vmeasure": metrics.v_measure_score,
-}
+import numpy as np
+from numpy.typing import ArrayLike
+from sklearn import mixture
+from signature_sampling.hyperparameter_factory import (
+    CLUSTERING_METHOD_FACTORY,
+    CLUSTERING_METRIC_FACTORY,
+)
+from typing import Iterable, Tuple, Callable, Dict
 
 
 class Clustering:
