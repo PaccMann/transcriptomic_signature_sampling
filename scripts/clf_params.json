@@ -1,0 +1,47 @@
+{
+    "Logistic": {
+        "max_iter": 5000,
+        "random_state": 42
+    },
+    "RF": {
+        "random_state": 42
+    },
+    "SVM-RBF": {
+        "probability": "True",
+        "random_state": 42
+    },
+    "SVM-Poly3":{
+        "kernel": "poly",
+        "probability": "True",
+        "random_state": 42
+    },
+    "LinearSVM": {
+        "max_iter": 5000,
+        "random_state": 42,
+        "dual": "False"
+    },
+    "KNN":{
+        "n_neighbors": 5
+    },
+    "EBM":{
+        "random_state": 42
+    },
+    "MLP":{
+        "input_size": 40,
+        "fc_layers": 1,
+        "fc_units": [
+            4
+        ],
+        "fc_activation": [
+            "relu",
+            "None"
+        ],
+        "batch_size": 32,
+        "lr": 0.001,
+        "l2_weight": 0.01,
+        "epochs": 200,
+        "early_stopping_wait": 5,
+        "real_weight": 1.0,
+        "synthetic_weight": 1.0
+    }
+}
