@@ -6,17 +6,16 @@
     "xval": "valid_logfpkm_colotype_stdz.csv",
     "yval": "valid_labels_logfpkm_colotype.csv",
     "input_size": 40,
-    "fc_layers": 2,
+    "fc_layers": 1,
     "fc_units": [
-        20,
         4
     ],
     "fc_activation": [
         "relu",
         "None"
     ],
-    "batch_size": 128,
-    "lr": 0.0001,
+    "batch_size": 32,
+    "lr": 0.001,
     "l2_weight": 0.01,
     "epochs": 200,
     "early_stopping_wait": 5,

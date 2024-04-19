@@ -12,15 +12,14 @@ import torch
 import torch.nn.functional as F
 import torch.optim as optim
 from fdsa.utils.helper import setup_logger
+from sklearn import metrics
+from sklearn.neighbors import KNeighborsClassifier
+from torch.utils.data import DataLoader
+from umap import UMAP
+
 from signature_sampling.torch_data import TCGADataset
 from signature_sampling.utils import purity_score
 from signature_sampling.vae import VAE
-from sklearn import metrics
-
-from sklearn.neighbors import KNeighborsClassifier
-
-from torch.utils.data import DataLoader
-from umap import UMAP
 
 parser = argparse.ArgumentParser()
 
@@ -91,7 +90,7 @@ def main(
 
     bs = train_params.get("batch_size", 32)
     train_loader = DataLoader(
-        train_dataset, batch_size=bs, drop_last=True, shuffle=True
+        train_dataset, batch_size=bs, drop_last=False, shuffle=True
     )
     test_loader = DataLoader(test_dataset, batch_size=bs)
     val_loader = DataLoader(val_dataset, batch_size=bs)
@@ -116,14 +115,11 @@ def main(
         latent_val = []
         val_labels = []
 
-        for x, y, _ in train_loader:
-            if ae_type == "vae":
-                x_recon, z_train, q_z, p_z = model(x.to(device))
-                loss_train = model.loss(x_recon, x, q_z, p_z)
-            elif ae_type == "ae":
-                x_recon, z_train = model(x.to(device))
-                loss_train = model.loss(x_recon, x)
-
+        for x, y in train_loader:
+            
+            x_recon, z_train, q_z, p_z = model(x.to(device))
+            loss_train = model.loss(x_recon, x, q_z, p_z)
+           
             optimizer.zero_grad()
             loss_train.backward()
             optimizer.step()
@@ -142,7 +138,7 @@ def main(
         model.eval()
         avg_valid_loss = 0
         avg_silhoutte_val = 0
-        for idx, (x_val, y_val, _) in enumerate(val_loader):
+        for idx, (x_val, y_val) in enumerate(val_loader):
             if ae_type == "vae":
                 x_recon, z_val, q_z, p_z = model(x_val.to(device))
                 loss_valid = model.loss(x_recon, x_val, q_z, p_z)
@@ -184,7 +180,7 @@ def main(
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
                     "train_loss": loss_train,
-                    "valid_loss": avg_valid_loss
+                    "valid_loss": avg_valid_loss,
                     # 'learning_rate': lr_expscheduler.get_last_lr()[0]
                 },
                 os.path.join(results_dir, "weights", model_name),
@@ -229,7 +225,7 @@ def main(
     test_recon = []
     test_input = []
     best_model.eval()
-    for x, y, _ in test_loader:
+    for x, y in test_loader:
         x_recon, z, q_z, p_z = best_model(x.to(device))
         loss = best_model.loss(x_recon, x, q_z, p_z)
 
@@ -337,7 +333,7 @@ def main(
     ax2.set_title(f"Reconstructed Data({train_params['input_size']}D)")
     ax3.set_title(f"Latent Code({train_params['latent_size']}D)")
     fig2.suptitle(
-        f"Visualisation using UMAP of Input and Output Data from {model_name}"
+        f"UMAP Visualisation of Input and Output Data from {model_name}"
     )
     fig2.subplots_adjust(wspace=0.3, hspace=0.4)
     fig2.savefig(

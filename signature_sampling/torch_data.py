@@ -10,18 +10,20 @@ class TCGADataset(Dataset):
 
     def __init__(
         self,
-        dataset_path: str,
-        label_path: str,
+        dataset: pd.DataFrame,
+        labels: pd.DataFrame,
+        label_encoder:LabelEncoder,
+        train:bool=False,
         device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),
     ) -> None:
-        self.dataset = np.asarray(pd.read_csv(dataset_path, index_col=0))
+        self.dataset = np.asarray(dataset)
         self.dataset = torch.tensor(self.dataset, dtype=torch.float).to(device)
-        label = pd.read_csv(label_path, index_col=0)
-        self.label_embedder = LabelEncoder()
-        self.label_embedder.fit(label)
-        self.label = torch.from_numpy(self.label_embedder.transform(label))
+        self.label_embedder = label_encoder
+        if train:
+            self.label_embedder.fit(labels)
+        self.label = torch.from_numpy(self.label_embedder.transform(labels))
 
     def __len__(self):
         """Get length of the dataset."""

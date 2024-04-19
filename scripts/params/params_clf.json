@@ -1,0 +1,7 @@
+{
+    "random_state": 42,
+    "max_iter": 5000,
+    "probability": "True",
+    "dual": "False",
+    "n_neighbours": 5
+}

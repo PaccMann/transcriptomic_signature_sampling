@@ -1,11 +1,18 @@
-import os
 import json
+import os
+import random
+from pathlib import Path
+from random import sample
+from typing import Callable, Dict, Iterable, Tuple
+
 import numpy as np
 import pandas as pd
-from scipy.stats import wilcoxon
-from typing import Iterable, Dict, Tuple, Callable
-from sklearn import metrics
+import sklearn
+import sklearn.preprocessing
 import torch
+from scipy.stats import wilcoxon
+from sklearn import metrics
+
 from signature_sampling.vae import VAE
 
 
@@ -27,6 +34,19 @@ def fpkm(
     fpkm_df = df.apply(lambda x: (x * 10**9) / lengths, axis=1)
     assert fpkm_df.iloc[0, 1] == df.iloc[0, 1] * 10**9 / lengths[1]
     fpkm_df = fpkm_df.apply(lambda x: x / patient_counts, axis=0)
+
+    return fpkm_df
+
+
+def fpkm_normalised_df(probemap, df):
+    gene_lengths = probemap["length"][df.columns]
+    assert all(gene_lengths.index == df.columns)
+    # get patient wise sum of counts
+    patient_sum = np.sum(df, axis=1)
+    assert len(patient_sum) == len(df)
+    assert np.allclose(patient_sum[0], sum(df.iloc[0, :]))
+    # get fpkm df and log2 transform
+    fpkm_df = fpkm(df, gene_lengths, patient_sum).applymap(lambda x: np.log2(x + 1))
 
     return fpkm_df
 
@@ -150,6 +170,17 @@ def get_latent_embeddings(
     results_dir: str,
     filename: str,
 ) -> torch.Tensor:
+    """_summary_
+
+    Args:
+        model (Callable): _description_
+        input_data (torch.Tensor): _description_
+        results_dir (str): _description_
+        filename (str): _description_
+
+    Returns:
+        torch.Tensor: _description_
+    """
     os.makedirs(results_dir, exist_ok=True)
 
     model.eval()
@@ -160,3 +191,52 @@ def get_latent_embeddings(
     torch.save(latent_embed, os.path.join(results_dir, filename))
 
     return latent_embed
+
+
+def subset_fraction(cv_splits: dict, percent: float = 0.1, seed: int = 42) -> dict:
+    """_summary_
+
+    Args:
+        cv_splits (dict): _description_
+        percent (float): _description_
+        seed (int): _description_
+
+    Returns:
+        dict: _description_
+    """
+    np.random.seed(seed)
+    random.seed(seed)
+
+    split = sample(list(cv_splits.keys()), 1)[0]
+    length = len(cv_splits[split]["train"])
+    subset_size = math.floor(percent * length)
+
+    for i in cv_splits.keys():
+        cv_splits[i]["train"] = sample(cv_splits[i]["train"], subset_size)
+
+    return cv_splits
+
+
+def stdz_external_dataset(
+    scaler: sklearn.preprocessing,
+    external_name: str,
+    external_df: pd.DataFrame,
+    external_labels: pd.DataFrame,
+    save_dir: Path,
+):
+    external_df = external_df.loc[:, scaler.feature_names_in_]
+    assert all(external_df.columns == scaler.feature_names_in_)
+    external_stdz = pd.DataFrame(
+        scaler.transform(external_df),
+        index=external_df.index,
+        columns=external_df.columns,
+    )
+    assert all(external_stdz.index == external_labels.index)
+
+    external_stdz.to_csv(save_dir / f"{external_name}_stdz.csv")
+    external_labels.to_csv(save_dir / f"{external_name}_labels.csv")
+
+
+def save_dict(dictionary: dict, save_path: str) -> None:
+    with open(save_path, "w") as f:
+        json.dump(dictionary, f)

@@ -1,10 +1,14 @@
-from sklearn.svm import SVC, LinearSVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.neighbors import KNeighborsClassifier
 from interpret.glassbox import ExplainableBoostingClassifier
-from sklearn.cluster import KMeans, SpectralClustering, AgglomerativeClustering
 from sklearn import metrics
+from sklearn.cluster import AgglomerativeClustering, KMeans, SpectralClustering
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.linear_model import LogisticRegression
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.svm import SVC, LinearSVC
+
+from signature_sampling.crossover_sampling import CrossoverSampling
+from signature_sampling.mlp_skorch_wrapper import skorch_mlp_wrapper
+from signature_sampling.sampler import BaseSampler, SMOTESampler
 
 CLUSTERING_METHOD_FACTORY = {
     "kmeans": KMeans,
@@ -24,11 +28,22 @@ CLUSTERING_METRIC_FACTORY = {
 }
 
 CLASSIFIER_FACTORY = {
-    "Logistic": LogisticRegression(max_iter=5000, random_state=42),
-    "RF": RandomForestClassifier(random_state=42),
-    "SVM-RBF": SVC(probability=True, random_state=42),
-    "SVM-Poly3": SVC(kernel="poly", probability=True, random_state=42),
-    "LinearSVM": LinearSVC(max_iter=5000, dual=False, random_state=42),
-    "KNN": KNeighborsClassifier(n_neighbors=5),
-    "EBM": ExplainableBoostingClassifier(random_state=42),
+    "Logistic": LogisticRegression,
+    "RF": RandomForestClassifier,
+    "SVM-RBF": SVC,
+    "SVM-Poly3": SVC,
+    "LinearSVM": LinearSVC,
+    "KNN": KNeighborsClassifier,
+    "EBM": ExplainableBoostingClassifier,
+    "MLP": skorch_mlp_wrapper
+    }
+
+SAMPLING_FACTORY = {
+    "local_crossover": CrossoverSampling,
+    "global_crossover": CrossoverSampling,
+    "smote": SMOTESampler,
+    "gamma_poisson": BaseSampler,
+    "poisson": BaseSampler,
+    "replacement": BaseSampler,
+    "unaugmented": BaseSampler,
 }
