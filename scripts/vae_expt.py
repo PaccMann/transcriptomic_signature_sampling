@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from fdsa.utils.helper import setup_logger
 from sklearn import metrics
+from sklearn.calibration import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
 from umap import UMAP
@@ -84,9 +85,16 @@ def main(
     xval_path = os.path.join(main_dir, train_params["xval"])
     yval_path = os.path.join(main_dir, train_params["yval"])
 
-    train_dataset = TCGADataset(xtrain_path, ytrain_path)
-    test_dataset = TCGADataset(xtest_path, ytest_path)
-    val_dataset = TCGADataset(xval_path, yval_path)
+    xtrain_df = pd.read_csv(xtrain_path,index_col=0)
+    ytrain_df = pd.read_csv(ytrain_path,index_col=0)
+    xtest_df = pd.read_csv(xtest_path,index_col=0)
+    ytest_df = pd.read_csv(ytest_path,index_col=0)
+    xval_df = pd.read_csv(xval_path,index_col=0)
+    yval_df = pd.read_csv(yval_path,index_col=0)
+
+    train_dataset = TCGADataset(xtrain_df, ytrain_df, LabelEncoder)
+    test_dataset = TCGADataset(xtest_df, ytest_df, train_dataset.label_embedder)
+    val_dataset = TCGADataset(xval_df, yval_df, train_dataset.label_embedder)
 
     bs = train_params.get("batch_size", 32)
     train_loader = DataLoader(
