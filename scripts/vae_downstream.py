@@ -164,15 +164,14 @@ def predict_clinical(
             model = load_model(vae_model_name, model_path)
 
             train_latent = get_latent_embeddings(
-                model, vae_model_name, train_tensor, results_path, "train_latent"
+                model, train_tensor, results_path, "train_latent"
             )
             test_latent = get_latent_embeddings(
-                model, vae_model_name, test_tensor, results_path, "test_latent"
+                model, test_tensor, results_path, "test_latent"
             )
             if external:
                 external_latent = get_latent_embeddings(
                     model,
-                    vae_model_name,
                     external_test_tensor,
                     results_path,
                     "cptac_latent",
