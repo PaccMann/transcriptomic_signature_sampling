@@ -1,3 +1,4 @@
+import json
 import os
 from pathlib import Path
 from typing import Counter, Dict, Iterable
@@ -156,7 +157,7 @@ def predict_clinical(
             test_tensor = torch.from_numpy(np.asarray(test_features, dtype=np.float32))
 
             model_path = os.path.join(
-                model_dir, vae_model_name, sampling, size, f"split_{split}"
+                model_dir, vae_model_name, sampling, size, f"run_{split}"
             )
             results_path = os.path.join(result_dir, sampling, size, f"split_{split}")
 
@@ -252,6 +253,8 @@ def predict_clinical(
 
 
 @click.command()
+@click.option("--clf_model", type=type=click.Choice(sorted(CLASSIFIER_FACTORY.keys())), help="Classification model to use.")
+@click.option("--size", type=str, help="class size of dataset.")
 @click.option(
     "--data_dir",
     required=True,
@@ -293,6 +296,8 @@ def predict_clinical(
 )
 @click.option("--seed", type=int, help="Seed for reproducibility.")
 def main(
+    clf_model,
+    size,
     data_dir,
     model_dir,
     result_root_dir,
@@ -322,23 +327,21 @@ def main(
     clinical_data = pd.read_csv(clinical_data_path, index_col=0)
     external_clinical_df = pd.read_csv(external_clinical_path, index_col=0)
 
-    for clf_model in ["MLP", "RF", "Logistic", "SVM-RBF", "KNN", "EBM"]:
-        for size in ["max", "500", "5000"]:
-            predict_clinical(
-                clf_model,
-                data_dir,
-                model_dir,
-                vae_model_name,
-                result_root_dir,
-                sampling_methods,
-                size,
-                cv_splits_idx,
-                clinical_data,
-                clinical_var,
-                external=True,
-                external_clinical=external_clinical_df,
-                n_splits=25,
-            )
+    predict_clinical(
+        clf_model,
+        data_dir,
+        model_dir,
+        vae_model_name,
+        result_root_dir,
+        sampling_methods,
+        size,
+        cv_splits_idx,
+        clinical_data,
+        clinical_var,
+        external=True,
+        external_clinical=external_clinical_df,
+        n_splits=25,
+    )
 
 
 if __name__ == "__main__":
