@@ -253,7 +253,11 @@ def predict_clinical(
 
 
 @click.command()
-@click.option("--clf_model", type=type=click.Choice(sorted(CLASSIFIER_FACTORY.keys())), help="Classification model to use.")
+@click.option(
+    "--clf_model",
+    type=click.Choice(sorted(CLASSIFIER_FACTORY.keys())),
+    help="Classification model to use.",
+)
 @click.option("--size", type=str, help="class size of dataset.")
 @click.option(
     "--data_dir",
