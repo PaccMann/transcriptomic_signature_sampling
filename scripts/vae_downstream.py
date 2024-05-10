@@ -274,7 +274,7 @@ def predict_clinical(
 @click.option(
     "--result_root_dir",
     required=True,
-    type=click.Path(path_type=Path, exists=True),
+    type=click.Path(path_type=Path),
     help="Directory where results should be saved.",
 )
 @click.option(
@@ -292,6 +292,7 @@ def predict_clinical(
 @click.option(
     "--clinical_var", type=str, help="Clinical variable name chosen for classification."
 )
+@click.option("--external", type=bool, help="Whether to test an external dataset.")
 @click.option(
     "--external_clinical_path",
     required=True,
@@ -308,6 +309,7 @@ def main(
     cv_splits_path,
     clinical_data_path,
     clinical_var,
+    external,
     external_clinical_path,
     seed,
 ):
@@ -329,7 +331,10 @@ def main(
     ]
 
     clinical_data = pd.read_csv(clinical_data_path, index_col=0)
-    external_clinical_df = pd.read_csv(external_clinical_path, index_col=0)
+    if external:
+        external_clinical_df = pd.read_csv(external_clinical_path, index_col=0)
+    else:
+        external_clinical_df = None 
 
     predict_clinical(
         clf_model,
@@ -342,8 +347,8 @@ def main(
         cv_splits_idx,
         clinical_data,
         clinical_var,
-        external=True,
-        external_clinical_path=external_clinical_df,
+        external,
+        external_clinical_df,
         n_splits=25,
     )
 
