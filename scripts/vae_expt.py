@@ -13,6 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from fdsa.utils.helper import setup_logger
 from sklearn import metrics
+from sklearn.calibration import LabelEncoder
 from sklearn.neighbors import KNeighborsClassifier
 from torch.utils.data import DataLoader
 from umap import UMAP
@@ -73,6 +74,7 @@ def main(
         train_params = json.load(readjson)
 
     train_params["seed"] = seed
+    label = train_params.get("label", "cms")
 
     with open(os.path.join(results_dir, "params.json"), "w") as f:
         json.dump(train_params, f)
@@ -84,9 +86,16 @@ def main(
     xval_path = os.path.join(main_dir, train_params["xval"])
     yval_path = os.path.join(main_dir, train_params["yval"])
 
-    train_dataset = TCGADataset(xtrain_path, ytrain_path)
-    test_dataset = TCGADataset(xtest_path, ytest_path)
-    val_dataset = TCGADataset(xval_path, yval_path)
+    xtrain_df = pd.read_csv(xtrain_path, index_col=0)
+    ytrain_df = pd.read_csv(ytrain_path, index_col=0)[label]
+    xtest_df = pd.read_csv(xtest_path, index_col=0)
+    ytest_df = pd.read_csv(ytest_path, index_col=0)[label]
+    xval_df = pd.read_csv(xval_path, index_col=0)
+    yval_df = pd.read_csv(yval_path, index_col=0)[label]
+
+    train_dataset = TCGADataset(xtrain_df, ytrain_df, LabelEncoder(), True)
+    test_dataset = TCGADataset(xtest_df, ytest_df, train_dataset.label_embedder)
+    val_dataset = TCGADataset(xval_df, yval_df, train_dataset.label_embedder)
 
     bs = train_params.get("batch_size", 32)
     train_loader = DataLoader(
@@ -116,10 +125,9 @@ def main(
         val_labels = []
 
         for x, y in train_loader:
-            
             x_recon, z_train, q_z, p_z = model(x.to(device))
             loss_train = model.loss(x_recon, x, q_z, p_z)
-           
+
             optimizer.zero_grad()
             loss_train.backward()
             optimizer.step()
@@ -332,9 +340,7 @@ def main(
     ax1.set_title(f"Input Data({train_params['input_size']}D)")
     ax2.set_title(f"Reconstructed Data({train_params['input_size']}D)")
     ax3.set_title(f"Latent Code({train_params['latent_size']}D)")
-    fig2.suptitle(
-        f"UMAP Visualisation of Input and Output Data from {model_name}"
-    )
+    fig2.suptitle(f"UMAP Visualisation of Input and Output Data from {model_name}")
     fig2.subplots_adjust(wspace=0.3, hspace=0.4)
     fig2.savefig(
         os.path.join(results_dir, "results", f"{model_name}_dataviz.png"),

@@ -16,7 +16,9 @@ from signature_sampling.utils import stdz_external_dataset
 def main(data_dir, external_name, external_xpath, external_ypath, colotype_path):
     colotype_genes = pd.read_csv(colotype_path)
 
-    sampling_methods = [f for f in data_dir.iterdir() if f.is_dir() and 'data' not in f.stem]
+    sampling_methods = [
+        f for f in data_dir.iterdir() if f.is_dir() and "data" not in f.stem
+    ]
 
     cptac_df = pd.read_csv(external_xpath, index_col=0)
     cptac_df = cptac_df.rename(
@@ -30,7 +32,7 @@ def main(data_dir, external_name, external_xpath, external_ypath, colotype_path)
         else:
             size = ["max", "500", "5000"]
         for s in size:
-            subfolders = list((method/s).rglob("**/"))
+            subfolders = list((method / s).rglob("**/"))
             for folder in subfolders[1:]:
                 scaler = joblib.load(folder / "scaler.pkl")
                 stdz_external_dataset(
