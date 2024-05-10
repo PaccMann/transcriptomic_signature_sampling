@@ -54,7 +54,7 @@ def run_clf(
 
     with open(params_path, "r") as f:
         params = json.load(f)
-    
+
     if "probability" in params[model].keys():
         params[model]["probability"] = literal_eval(params[model]["probability"])
 
@@ -252,10 +252,12 @@ parser.add_argument(
     type=Path,
     help="Path to the directory where results will be saved.",
 )
-parser.add_argument("seed", type=int, help="Seed for numpy and torch, esp for mlp skorch.")
+parser.add_argument(
+    "seed", type=int, help="Seed for numpy and torch, esp for mlp skorch."
+)
 
-def main(data_dir: str, params_path: str, result_root_dir: str, seed:int):
 
+def main(data_dir: str, params_path: str, result_root_dir: str, seed: int):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
@@ -266,9 +268,9 @@ def main(data_dir: str, params_path: str, result_root_dir: str, seed:int):
         "global_crossover",
         "smote",
         "replacement",
-        "unaugmented"
+        "unaugmented",
     ]
-    for model in ["MLP","RF","Logistic","SVM-RBF", "KNN", "EBM"]:
+    for model in ["MLP", "RF", "Logistic", "SVM-RBF", "KNN", "EBM"]:
         for size in ["max", "500", "5000"]:
             run_clf(
                 model, data_dir, result_root_dir, sampling_methods, params_path, size
