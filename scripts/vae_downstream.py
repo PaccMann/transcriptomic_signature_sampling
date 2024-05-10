@@ -343,7 +343,7 @@ def main(
         clinical_data,
         clinical_var,
         external=True,
-        external_clinical=external_clinical_df,
+        external_clinical_path=external_clinical_df,
         n_splits=25,
     )
 
