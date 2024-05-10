@@ -16,6 +16,7 @@ from signature_sampling.utils import get_latent_embeddings, load_model
 
 def predict_clinical(
     clf_model: str,
+    clf_params:dict,
     data_dir: str,
     model_dir: str,
     vae_model_name: str,
@@ -34,6 +35,7 @@ def predict_clinical(
 
     Args:
         clf_model (str): Classification model to use for the downstream task.
+        clf_params (dict): Dictionary of parameters to initialise the classifier model.
         data_dir (str): Root directory of the datasets.
         model_dir (str): Path to the saved vae model.
         vae_model_name (str): Name of the saved vae model.
@@ -177,7 +179,7 @@ def predict_clinical(
                     "cptac_latent",
                 )
 
-            estimator = CLASSIFIER_FACTORY[clf_model]
+            estimator = CLASSIFIER_FACTORY[clf_model](**clf_params[clf_model])
             estimator.fit(train_latent.detach().numpy(), train_target)
             joblib.dump(
                 estimator, os.path.join(save_dir, f"split_{split}/{clf_model}_model")
@@ -257,6 +259,11 @@ def predict_clinical(
     type=click.Choice(sorted(CLASSIFIER_FACTORY.keys())),
     help="Classification model to use.",
 )
+@click.option(
+    "--clf_params_path",
+    type=click.Path(path_type=Path, exists=True),
+    help="Path to classifier parameters.",
+)
 @click.option("--size", type=str, help="class size of dataset.")
 @click.option(
     "--data_dir",
@@ -301,6 +308,7 @@ def predict_clinical(
 @click.option("--seed", type=int, help="Seed for reproducibility.")
 def main(
     clf_model,
+    clf_params_path,
     size,
     data_dir,
     model_dir,
@@ -318,6 +326,9 @@ def main(
 
     with open(cv_splits_path, "r") as f:
         cv_splits_idx = json.load(f)
+    
+    with open(clf_params_path, "r") as f:
+        clf_params = json.load(f)
 
     sampling_methods = [
         "poisson",
@@ -337,6 +348,7 @@ def main(
 
     predict_clinical(
         clf_model,
+        clf_params,
         data_dir,
         model_dir,
         vae_model_name,
