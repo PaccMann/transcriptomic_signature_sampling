@@ -12,8 +12,8 @@ class TCGADataset(Dataset):
         self,
         dataset: pd.DataFrame,
         labels: pd.DataFrame,
-        label_encoder:LabelEncoder,
-        train:bool=False,
+        label_encoder: LabelEncoder,
+        train: bool = False,
         device: torch.device = torch.device(
             "cuda" if torch.cuda.is_available() else "cpu"
         ),
