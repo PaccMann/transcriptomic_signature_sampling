@@ -35,8 +35,8 @@ CLASSIFIER_FACTORY = {
     "LinearSVM": LinearSVC,
     "KNN": KNeighborsClassifier,
     "EBM": ExplainableBoostingClassifier,
-    "MLP": skorch_mlp_wrapper
-    }
+    "MLP": skorch_mlp_wrapper,
+}
 
 SAMPLING_FACTORY = {
     "local_crossover": CrossoverSampling,
