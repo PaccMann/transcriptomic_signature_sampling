@@ -1,0 +1,7 @@
+{
+    "n_samples":100,
+    "k_clusters":4,
+    "loc":0,
+    "scale":0.05,
+    "latent_dim": 4
+}
