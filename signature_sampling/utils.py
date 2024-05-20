@@ -193,6 +193,17 @@ def get_latent_embeddings(
     return latent_embed
 
 
+def get_decoded_embeddings(
+    model: Callable,
+    latent_embedding: torch.Tensor,
+) -> torch.tensor:
+    model.eval()
+    decoded_embedding = model.decoder(latent_embedding)
+    reconstructed_embedding = model.final_layer(decoded_embedding)
+
+    return reconstructed_embedding
+
+
 def subset_fraction(cv_splits: dict, percent: float = 0.1, seed: int = 42) -> dict:
     """_summary_
 
