@@ -19,11 +19,8 @@ from sklearn.mixture import GaussianMixture
 from torch.distributions.normal import Normal
 
 from signature_sampling.hyperparameter_factory import CLASSIFIER_FACTORY
-from signature_sampling.utils import (
-    get_decoded_embeddings,
-    get_latent_embeddings,
-    load_model,
-)
+from signature_sampling.utils import (get_decoded_embeddings,
+                                      get_latent_embeddings, load_model)
 
 warnings.filterwarnings("ignore")
 
@@ -191,13 +188,13 @@ def generate_classify(
             generated_test_labels = pd.DataFrame(np.concatenate(generated_labels))
 
             generated_test_samples.to_csv(
-                os.path.join(result_dir, "vae_generated_test_samples.csv")
+                os.path.join(results_path, "vae_generated_test_samples.csv")
             )
             generated_test_embed.to_csv(
-                os.path.join(result_dir, "vae_generated_test_latent.csv")
+                os.path.join(results_path, "vae_generated_test_latent.csv")
             )
             generated_test_labels.to_csv(
-                os.path.join(result_dir, "vae_generated_test_labels.csv")
+                os.path.join(results_path, "vae_generated_test_labels.csv")
             )
 
             if external:
@@ -254,13 +251,13 @@ def generate_classify(
                 generated_ext_labels = pd.DataFrame(np.concatenate(generated_labels))
 
                 generated_ext_samples.to_csv(
-                    os.path.join(result_dir, "vae_generated_ext_samples.csv")
+                    os.path.join(results_path, "vae_generated_ext_samples.csv")
                 )
                 generated_ext_embed.to_csv(
-                    os.path.join(result_dir, "vae_generated_ext_latent.csv")
+                    os.path.join(results_path, "vae_generated_ext_latent.csv")
                 )
                 generated_ext_labels.to_csv(
-                    os.path.join(result_dir, "vae_generated_ext_labels.csv")
+                    os.path.join(results_path, "vae_generated_ext_labels.csv")
                 )
 
             clf_model_path = os.path.join(
