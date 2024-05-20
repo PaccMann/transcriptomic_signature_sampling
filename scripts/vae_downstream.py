@@ -1,5 +1,7 @@
 import json
 import os
+import warnings
+from ast import literal_eval
 from pathlib import Path
 from typing import Counter, Dict, Iterable
 
@@ -13,10 +15,12 @@ from sklearn.metrics import balanced_accuracy_score, roc_auc_score
 from signature_sampling.hyperparameter_factory import CLASSIFIER_FACTORY
 from signature_sampling.utils import get_latent_embeddings, load_model
 
+warnings.filterwarnings("ignore")
+
 
 def predict_clinical(
     clf_model: str,
-    clf_params:dict,
+    clf_params: dict,
     data_dir: str,
     model_dir: str,
     vae_model_name: str,
@@ -70,9 +74,6 @@ def predict_clinical(
         columns=["bal_acc", "std_bal_acc", "cptac_bal_acc", "std_cptac_bal_acc"],
         index=sampling_methods,
     )
-    # std_metrics = pd.DataFrame(
-    #     columns=["bal_acc", "cptac_bal_acc"], index=sampling_methods
-    # )
 
     for sampling in sampling_methods:
         scores = []
@@ -82,7 +83,7 @@ def predict_clinical(
 
         metrics = pd.DataFrame(columns=["bal_acc", "cptac_bal_acc"])
 
-        if sampling == "unbalanced":
+        if sampling == "unaugmented":
             size = ""
 
         save_dir = os.path.join(result_dir, f"{sampling}", size)
@@ -326,9 +327,14 @@ def main(
 
     with open(cv_splits_path, "r") as f:
         cv_splits_idx = json.load(f)
-    
+
     with open(clf_params_path, "r") as f:
         clf_params = json.load(f)
+
+    if "probability" in clf_params[clf_model].keys():
+        clf_params[clf_model]["probability"] = literal_eval(
+            clf_params[clf_model]["probability"]
+        )
 
     sampling_methods = [
         "poisson",
@@ -344,7 +350,7 @@ def main(
     if external:
         external_clinical_df = pd.read_csv(external_clinical_path, index_col=0)
     else:
-        external_clinical_df = None 
+        external_clinical_df = None
 
     predict_clinical(
         clf_model,
