@@ -20,11 +20,11 @@ def main(data_dir, external_name, external_xpath, external_ypath, colotype_path)
         f for f in data_dir.iterdir() if f.is_dir() and "data" not in f.stem
     ]
 
-    cptac_df = pd.read_csv(external_xpath, index_col=0)
-    cptac_df = cptac_df.rename(
+    ext_df = pd.read_csv(external_xpath, index_col=0)
+    ext_df = ext_df.rename(
         columns=dict(zip(colotype_genes["ensemblid"], colotype_genes["SYMBOL"]))
     )
-    cptac_labels = pd.read_csv(external_ypath, index_col=0)
+    ext_labels = pd.read_csv(external_ypath, index_col=0)
 
     for method in sampling_methods:
         if "unaugmented" in method.stem:
@@ -36,7 +36,7 @@ def main(data_dir, external_name, external_xpath, external_ypath, colotype_path)
             for folder in subfolders[1:]:
                 scaler = joblib.load(folder / "scaler.pkl")
                 stdz_external_dataset(
-                    scaler, external_name, cptac_df, cptac_labels, folder
+                    scaler, external_name, ext_df, ext_labels, folder
                 )
 
 
