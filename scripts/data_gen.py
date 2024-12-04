@@ -43,7 +43,7 @@ warnings.filterwarnings("ignore")
     help="Path to probemap file that maps genes to ensembl ids and specifies gene lengths.",
 )
 @click.option(
-    "--colotype_path",
+    "--signature_path",
     required=True,
     type=click.Path(path_type=Path, exists=True),
     help="Path to file containing info about signature genes and their subtypes.",
@@ -72,7 +72,7 @@ def main(
     ref_df_path: Path,
     ref_labels_path: Path,
     probemap_path: Path,
-    colotype_path: Path,
+    signature_path: Path,
     sampling_method: str,
     class_size: int,
     target: str,
@@ -141,7 +141,7 @@ def main(
             save_path = save_dir / f"{i+1}"
             sampler = SAMPLING_FACTORY[sampling_method](sampling_method, class_size)
             sampler.init_target_signatures(signature_genes)
-            sampled_df, sampled_labels = sampler.sample(train_df, train_labels, target)
+            sampled_df, sampled_labels = sampler.sample(train_df, train_labels, target, **{'gamma_poisson_r':5, 'poisson_r':5, 'overlapping_genes':['MCM2','MKI67']})
             augmented_df = pd.concat([train_df, sampled_df])
             augmented_labels = pd.concat([train_labels, sampled_labels])
             shuffle_idx = np.random.permutation(range(len(augmented_df)))
@@ -182,13 +182,13 @@ def main(
 
         # save augmented logfpkm data and stdz params
         train_augmented_fpkm_df_stdz.to_csv(
-            save_path / "train_logfpkm_colotype_stdz.csv"
+            save_path / "train_logfpkm_stdz.csv"
         )
         valid_augmented_fpkm_df_stdz.to_csv(
-            save_path / "valid_logfpkm_colotype_stdz.csv"
+            save_path / "valid_logfpkm_stdz.csv"
         )
-        ytrain.to_csv(os.path.join(save_path, "train_labels_logfpkm_colotype.csv"))
-        yval.to_csv(os.path.join(save_path, "valid_labels_logfpkm_colotype.csv"))
+        ytrain.to_csv(os.path.join(save_path, "train_labels_logfpkm.csv"))
+        yval.to_csv(os.path.join(save_path, "valid_labels_logfpkm.csv"))
 
         # standardise test set based on training set
         assert all(train_augmented_fpkm_df_stdz.columns == test_df.columns)
@@ -199,8 +199,8 @@ def main(
             index=test_fpkm_df.index,
         )
         # test_fpkm_stdz = (test_fpkm_df - training_mean) / training_std
-        test_fpkm_stdz.to_csv(os.path.join(save_path, "test_logfpkm_colotype_stdz.csv"))
-        test_labels.to_csv(os.path.join(save_path, "test_labels_colotype_stdz.csv"))
+        test_fpkm_stdz.to_csv(os.path.join(save_path, "test_logfpkm_stdz.csv"))
+        test_labels.to_csv(os.path.join(save_path, "test_labels_stdz.csv"))
 
 
 if __name__ == "__main__":
