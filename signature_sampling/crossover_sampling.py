@@ -2,7 +2,7 @@ import math
 import random
 from collections import Counter
 from copy import deepcopy
-from typing import Dict, Iterable, List, Tuple, Union
+from typing import Any, Dict, Iterable, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,7 @@ from signature_sampling.utils import time_func
 
 
 class CrossoverSampling(BaseSampler):
-    def __init__(self, sampling_method: str, class_size: int):
+    def __init__(self, sampling_method: str, class_size: Any):
         """_summary_
 
         Args:
@@ -40,7 +40,7 @@ class CrossoverSampling(BaseSampler):
         dominant_signature_as_set = set(dominant_signature)
         
         for gene in overlapping_genes:
-            subtypes_with_gene = [subtype for subtype, signature in processed_subtype_to_signature.items() if gene in signature]
+            subtypes_with_gene = [subtype_ for subtype_, signature in processed_subtype_to_signature.items() if gene in signature]
             if len(subtypes_with_gene) > 1:
                 chosen_subtype = np.random.choice(subtypes_with_gene)
                 subtypes_with_gene.remove(chosen_subtype)
@@ -56,6 +56,30 @@ class CrossoverSampling(BaseSampler):
         processed_subtype_to_signature[subtype] = dominant_signature
         return processed_subtype_to_signature
     
+    def preprocess_correlated_signatures(self, subtype: str, overlapping_genes:List[str]) -> Dict[str, List[str]]:
+        processed_subtype_to_signature = deepcopy(self.target_signatures)
+        dominant_signature = processed_subtype_to_signature.pop(subtype)
+        dominant_signature_as_set = set(dominant_signature)
+        
+        # for gene in overlapping_genes:
+        subtypes_with_overlapping_genes = []
+        for subtype_, signature in processed_subtype_to_signature.items():
+            if '\t'.join(map(str, overlapping_genes)) in '\t'.join(map(str, signature)):
+                subtypes_with_overlapping_genes.append(subtype_) 
+        if len(subtypes_with_overlapping_genes) > 1:
+            chosen_subtype = np.random.choice(subtypes_with_overlapping_genes)
+            subtypes_with_overlapping_genes.remove(chosen_subtype)
+            for current_subtype in subtypes_with_overlapping_genes:
+                updated_signature = [feature for feature in processed_subtype_to_signature[current_subtype] if feature not in overlapping_genes]
+                processed_subtype_to_signature.update({current_subtype: updated_signature})
+    
+        processed_subtype_to_signature = {
+            current_subtype: [feature for feature in signature if feature not in dominant_signature_as_set]
+            for current_subtype, signature in processed_subtype_to_signature.items()
+        }
+        
+        processed_subtype_to_signature[subtype] = dominant_signature
+        return processed_subtype_to_signature
 
     def interclass_sampling(
         self,
@@ -168,7 +192,7 @@ class CrossoverSampling(BaseSampler):
             current_subset_to_fill = sampling_idx.loc[sampled_labels[target]==item,:]
             
             
-            processed_signatures = self.preprocess_signatures(item, overlapping_genes)
+            processed_signatures = self.preprocess_correlated_signatures(item, overlapping_genes)
             subsampled_df_list = []
             for k, v in processed_signatures.items():
                 subsampled_df_list.append(
@@ -239,7 +263,7 @@ class CrossoverSampling(BaseSampler):
             if ref_sample_index.dtype == int:
                 ref_sample_index = ref_sample_index.astype(str)
             ref_sample_index = ref_sample_index + "S"
-            processed_signatures = self.preprocess_signatures(k, overlapping_genes)
+            processed_signatures = self.preprocess_correlated_signatures(k, overlapping_genes)
             
             for key, value in processed_signatures.items():
                 idx = subset.index[sampling_idx.loc[:, key]]
