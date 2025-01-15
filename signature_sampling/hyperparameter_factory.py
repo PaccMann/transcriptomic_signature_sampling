@@ -44,6 +44,8 @@ SAMPLING_FACTORY = {
     "smote": SMOTESampler,
     "gamma_poisson": BaseSampler,
     "poisson": BaseSampler,
+    "unmod_gamma_poisson": BaseSampler,
+    "unmod_poisson": BaseSampler,
     "replacement": BaseSampler,
     "unaugmented": BaseSampler,
 }

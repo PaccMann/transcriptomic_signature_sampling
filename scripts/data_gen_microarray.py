@@ -2,6 +2,7 @@ import json
 import os
 import warnings
 from ast import literal_eval
+from collections import Counter
 from pathlib import Path
 
 import click
@@ -80,10 +81,7 @@ def main(
     seed: int,
     save_dir: Path,
 ):
-    # size = "max" if class_size is None else class_size
 
-    # save_path = os.path.join(save_dir, f"{sampling_method}", f"{size}") in shell script
-    # os.makedirs(save_path, exist_ok=True)
     if class_size == "max":
         class_size = None
     else:
@@ -102,7 +100,7 @@ def main(
     ref_df = pd.read_csv(ref_df_path, index_col=0)
     ref_labels = pd.read_csv(ref_labels_path, index_col=0)
     assert all(ref_df.index == ref_labels.index)
-    # ref_df = ref_df.applymap(lambda x: 2**x - 1)  # undo the log transformation
+
     # remove ensembl version ID if present
     if any("ENS" in x for x in ref_df.columns):
         ref_df.columns = [i.split(".")[0] for i in ref_df.columns]
@@ -112,13 +110,13 @@ def main(
 
     # TODO: add primary tumour check
 
-    if os.path.exists(colotype_path):
-        colotype_genes = pd.read_csv(colotype_path)
+    if os.path.exists(signature_path):
+        genes = pd.read_csv(signature_path)
     else:
-        colotype_genes = dict()
+        genes = dict()
 
     signature_genes = dict(
-        colotype_genes.groupby("subtype").apply(lambda x: x[gene_type].values)
+        genes.groupby("subtype").apply(lambda x: x[gene_type].values)
     )
 
     splits = len(cv_splits.keys())
@@ -135,36 +133,44 @@ def main(
         test_labels = pd.DataFrame(ref_labels.loc[test_idx, :], columns=[target])
         test_df.index.name = None
         test_labels.index.name = None
-
+        target_count = dict(Counter(train_labels[target]))
         # sampler_obj = Sampler()
         if sampling_method != "unaugmented":
             save_path = save_dir / f"{i+1}"
-            sampler = SAMPLING_FACTORY[sampling_method](sampling_method, class_size)
-            sampler.init_target_signatures(signature_genes)
-            sampled_df, sampled_labels = sampler.sample(train_df, train_labels, target, **{'gamma_poisson_r':5, 'poisson_r':5, 'overlapping_genes':['MCM2','MKI67']})
-            augmented_df = pd.concat([train_df, sampled_df])
-            augmented_labels = pd.concat([train_labels, sampled_labels])
-            shuffle_idx = np.random.permutation(range(len(augmented_df)))
+            if len(set(target_count.values())) == 1 and class_size is None:
+                augmented_df = train_df
+                augmented_labels = train_labels
+            else:
+                sampler = SAMPLING_FACTORY[sampling_method](sampling_method, class_size)
+                sampler.init_target_signatures(signature_genes)
+                sampled_df, sampled_labels = sampler.sample(
+                    train_df,
+                    train_labels,
+                    target,
+                    **{
+                        "gamma_poisson_r": 5,
+                        "poisson_r": 5,
+                        "overlapping_genes": ["MCM2", "MKI67"],
+                    },
+                )
+                augmented_df = pd.concat([train_df, sampled_df])
+                augmented_labels = pd.concat([train_labels, sampled_labels])
+                shuffle_idx = np.random.permutation(range(len(augmented_df)))
 
-            # real+synthetic samples of counts and labels
-            augmented_df = augmented_df.iloc[shuffle_idx]
-            augmented_labels = augmented_labels.iloc[shuffle_idx]
+                augmented_df = augmented_df.iloc[shuffle_idx]
+                augmented_labels = augmented_labels.iloc[shuffle_idx]
 
         else:
             augmented_df = train_df
             augmented_labels = train_labels
             save_path = save_dir.parent / f"{i+1}"
 
-        # save augmented count data
         os.makedirs(save_path, exist_ok=True)
-        augmented_df.to_csv(os.path.join(save_path, "train_counts_colotype.csv"))
-        augmented_labels.to_csv(os.path.join(save_path, "train_labels_colotype.csv"))
-
-        # FPKM normalise
-        augmented_fpkm_df = fpkm_normalised_df(probemap, augmented_df)
+        augmented_df.to_csv(os.path.join(save_path, "train.csv"))
+        augmented_labels.to_csv(os.path.join(save_path, "train_labels.csv"))
 
         Xtrain, Xval, ytrain, yval = train_test_split(
-            augmented_fpkm_df,
+            augmented_df,
             augmented_labels,
             test_size=validation_size,
             random_state=seed,
@@ -172,34 +178,28 @@ def main(
         )
 
         scaler = StandardScaler()
-        train_augmented_fpkm_df_stdz = pd.DataFrame(
+        train_augmented_df_stdz = pd.DataFrame(
             scaler.fit_transform(Xtrain), columns=Xtrain.columns, index=Xtrain.index
         )
-        valid_augmented_fpkm_df_stdz = pd.DataFrame(
+        valid_augmented_df_stdz = pd.DataFrame(
             scaler.transform(Xval), columns=Xval.columns, index=Xval.index
         )
         joblib.dump(scaler, save_path / "scaler.pkl")
 
-        # save augmented logfpkm data and stdz params
-        train_augmented_fpkm_df_stdz.to_csv(
-            save_path / "train_logfpkm_stdz.csv"
-        )
-        valid_augmented_fpkm_df_stdz.to_csv(
-            save_path / "valid_logfpkm_stdz.csv"
-        )
-        ytrain.to_csv(os.path.join(save_path, "train_labels_logfpkm.csv"))
-        yval.to_csv(os.path.join(save_path, "valid_labels_logfpkm.csv"))
+        train_augmented_df_stdz.to_csv(save_path / "train_logrma_stdz.csv")
+        valid_augmented_df_stdz.to_csv(save_path / "valid_logrma_stdz.csv")
+        ytrain.to_csv(os.path.join(save_path, "train_labels_logrma.csv"))
+        yval.to_csv(os.path.join(save_path, "valid_labels_logrma.csv"))
 
         # standardise test set based on training set
-        assert all(train_augmented_fpkm_df_stdz.columns == test_df.columns)
-        test_fpkm_df = fpkm_normalised_df(probemap, test_df)
-        test_fpkm_stdz = pd.DataFrame(
-            scaler.transform(test_fpkm_df),
-            columns=test_fpkm_df.columns,
-            index=test_fpkm_df.index,
+        assert all(train_augmented_df_stdz.columns == test_df.columns)
+        test_stdz = pd.DataFrame(
+            scaler.transform(test_df),
+            columns=test_df.columns,
+            index=test_df.index,
         )
-        # test_fpkm_stdz = (test_fpkm_df - training_mean) / training_std
-        test_fpkm_stdz.to_csv(os.path.join(save_path, "test_logfpkm_stdz.csv"))
+
+        test_stdz.to_csv(os.path.join(save_path, "test_logrma_stdz.csv"))
         test_labels.to_csv(os.path.join(save_path, "test_labels_stdz.csv"))
 
 

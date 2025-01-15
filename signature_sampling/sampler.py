@@ -1,20 +1,23 @@
 import math
 import random
 from collections import Counter
-from typing import Iterable, List, Tuple, Union
+from typing import Any, Iterable, List, Tuple, Union
 
 import numpy as np
 import pandas as pd
+import torch
 import torch.distributions as td
 from imblearn.over_sampling import SMOTE
 from sklearn.preprocessing import LabelEncoder
+
+from signature_sampling.utils import time_func
 
 
 class BaseSampler:
     """Sampling class to generate datasets augmented by various sampling strategies for
     Transcriptomic data."""
 
-    def __init__(self, sampling_method: str, class_size: int) -> None:
+    def __init__(self, sampling_method: str, class_size: Any) -> None:
         """_summary_
 
         Args:
@@ -28,9 +31,11 @@ class BaseSampler:
         self.class_size = class_size
 
         self.get_samples = {
+            "unmod_poisson": self.poisson_unmod,
             "poisson": self.poisson_local_mean,
             "replacement": self.replacement_sampler,
             "gamma_poisson": self.gamma_poisson_sampler,
+            "unmod_gamma_poisson": self.gamma_poisson_unmod
         }
 
     def init_target_signatures(self, target_signatures: dict):
@@ -56,6 +61,36 @@ class BaseSampler:
         ]
         return grouped_indices
 
+    def poisson_unmod(
+        self, X: pd.DataFrame, length: int, target_class: str, **kwargs
+    ) -> pd.DataFrame:
+        """Poisson sampling strategy for RNA-Seq data representing a phenotype (here, cms).
+
+        Args:
+            X (pd.DataFrame): Dataframe containing RNA-Seq values for patients of a
+            given phenotype.
+            Indices are patient ID and columns represent genes.
+            length (int): Number of samples to generate.
+            target_class (str): target class being augmented. Used only for creating a unique
+            patient ID.
+
+        Returns:
+            pd.DataFrame: Dataframe of only newly generated samples from the Poisson
+            distribution with the specified "cms" label.
+        """
+        samples = []
+        project = X.index[0].split("-")[0]
+        mean = X.mean().values
+        poisson = list(map(td.Poisson, mean))
+        for i in range(length):
+            samples.append(list(map(lambda x: x.sample().item(), poisson)))
+
+        return pd.DataFrame(
+            samples,
+            index=[f"{project}-{target_class}-S{i}" for i in range(length)],
+            columns=X.columns,
+        )
+    
     def poisson_local_mean(
         self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
@@ -90,6 +125,60 @@ class BaseSampler:
             columns=X.columns,
         )
 
+    def gamma_poisson_unmod(
+        self, X: pd.DataFrame, length: int, target_class: str, **kwargs
+    ) -> pd.DataFrame:
+        """Gamma-Poisson (Negative Binomial) sampling strategy for RNA-Seq data
+        representing a phenotype (here, cms).
+
+        Args:
+            X (pd.DataFrame): Dataframe containing RNA-Seq values for patients of a
+            given phenotype.
+            Indices are patient ID and columns represent genes.
+            length (int): Number of samples to generate.
+            target_class (str): target class being augmented. Used only for creating a unique
+            patient ID.
+
+        Returns:
+            pd.DataFrame: Dataframe of only newly generated samples from the
+            Gamma-Poisson distribution
+            with the specified "cms" label.
+        """
+
+        def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
+            """Function sampling the mu parameter from the Gamma-Poisson distribution.
+
+            Args:
+                mean (np.ndarray): Array of means to initialise the Gamma distribution.
+                var (np.ndarray): Array of standard deviations to initialise the Gamma
+                distribution.
+
+            Returns:
+                List: List of means to intialise the Poisson distribution.
+            """
+
+            beta = mean / var
+            alpha = mean * beta
+            gamma = list(map(td.Gamma, alpha, beta))
+            mu = list(map(lambda x: x.sample(), gamma))
+            return mu
+
+        samples = []
+        project = X.index[0].split("-")[0]
+    
+        mean = X.mean().values
+        var = X.var().values
+        mu = mu_gammapoisson(mean, var)
+        poisson = list(map(td.Poisson, mu))
+        for i in range(length):
+            samples.append(list(map(lambda x: x.sample().item(), poisson)))
+
+        return pd.DataFrame(
+            samples,
+            index=[f"{project}-{target_class}-S{i}" for i in range(length)],
+            columns=X.columns,
+        )
+    
     def gamma_poisson_sampler(
         self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
@@ -149,7 +238,7 @@ class BaseSampler:
         )
 
     def replacement_sampler(
-        self, X: pd.DataFrame, length: int, target_class: str
+        self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
         """Random oversampling method.
 
@@ -168,12 +257,13 @@ class BaseSampler:
         ref_sample = X.iloc[random_idx, :]
         ref_sample.index = ref_sample.index + [f"S{i}" for i in range(length)]
         return ref_sample
-
+    @time_func
     def sample(
         self,
         X: pd.DataFrame,
         y: pd.DataFrame,
         target: str,
+        **kwargs
     ) -> Tuple:
         """Main method to generate augmented datasets.
 
@@ -211,8 +301,8 @@ class BaseSampler:
             subset = X.iloc[subset_idx, :]
             size = max_count - v if self.class_size is None else self.class_size - v
             # size = max_count - v if self.class_size is None else self.class_size # if you want to sample specified dset_size samples
-
-            new_samples = self.get_samples[self.sampling_method](subset, size, k)
+            
+            new_samples = self.get_samples[self.sampling_method](subset, size, k, **kwargs)
 
             new_labels = pd.DataFrame({target: [k] * size}, index=new_samples.index)
 
@@ -225,8 +315,8 @@ class BaseSampler:
 class SMOTESampler(BaseSampler):
     def __init__(self, sampling_method: str, class_size: int) -> None:
         super().__init__(sampling_method, class_size)
-
-    def sample(self, X: pd.DataFrame, y: pd.DataFrame, target: str) -> Tuple:
+    @time_func
+    def sample(self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs) -> Tuple:
         """Synthetic Minority Oversampling Technique.
 
         Args:
@@ -265,7 +355,7 @@ class SMOTESampler(BaseSampler):
 
         resampled_df, resampled_labels = sm.fit_resample(df_tmp, y)
 
-        resampled_df["cms"] = resampled_labels
+        resampled_df[target] = resampled_labels
         resampled_df["index"] = le_index.inverse_transform(resampled_df["index"])
 
         resampled_df = resampled_df.set_index("index")
