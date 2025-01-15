@@ -15,33 +15,35 @@ from signature_sampling.utils import significance_testing
 
 sampling_method_keys = {
     "gamma_poisson": "Mod.GP",
+    "unmod_gamma_poisson": "GP",
     "global_crossover": "Inter-Class",
     "local_crossover": "Intra-Class",
     "poisson": "Mod.Poisson",
+    "unmod_poisson": "Poisson",
     "replacement": "Resampling",
     "smote": "SMOTE",
     "unaugmented": "Unaugmented",
 }
 
 colour_pal = sns.color_palette("colorblind")
-hue_order_ = [
-    "gamma_poisson",
-    "global_crossover",
-    "local_crossover",
-    "poisson",
-    "replacement",
-    "smote",
-    "unaugmented",
-]
-methods = [
-    "Mod.GP",
-    "Inter-Class",
-    "Intra-Class",
-    "Mod.Poisson",
-    "Replacement",
-    "SMOTE",
-    "Unaugmented",
-]
+# hue_order_ = [
+#     "gamma_poisson",
+#     "global_crossover",
+#     "local_crossover",
+#     "poisson",
+#     "replacement",
+#     "smote",
+#     "unaugmented",
+# ]
+# methods = [
+#     "Mod.GP",
+#     "Inter-Class",
+#     "Intra-Class",
+#     "Mod.Poisson",
+#     "Replacement",
+#     "SMOTE",
+#     "Unaugmented",
+# ]
 sns.set_palette(colour_pal)
 sns.set(font="Helvetica")
 
@@ -97,6 +99,7 @@ def main(
     # TODO - for auto num of sublots do it based on len of class sizes
     classifiers = literal_eval(classifiers)
     sampling_methods = literal_eval(sampling_methods)
+    methods = [sampling_method_keys[method] for method in sampling_methods]
     class_sizes = literal_eval(class_sizes)
 
     fig, axs = plt.subplots(1, len(class_sizes), sharey=True, figsize=(15, 4))
@@ -121,12 +124,18 @@ def main(
         plot_ext_bal_acc = pd.concat(overall_metrics_external_list, axis=0)
 
         sns.violinplot(data=plot_bal_acc, x="method", y=internal_key, ax=axs[i])
-        handles, labels = axs[i].get_legend_handles_labels()
+        # handles, labels = axs[i].get_legend_handles_labels()
         axs[i].set_xlabel("Data Augmentation Methods")
-        axs[i].set_ylabel("Balanced Accuracy")
+        # axs[i].set_ylabel("Balanced Accuracy")
+        axs[i].set_ylabel("ROC-AUC Score")
         axs[i].set_title(f"Class Size : {size}")
         # axs[i].set_ylim([0.7,0.9])
-        axs[i].set_xticklabels(methods, rotation=45, ha="right", rotation_mode="anchor")
+        axs[i].set_xticklabels(
+            methods,
+            rotation=45,
+            ha="right",
+            rotation_mode="anchor",
+        )
         fig.savefig(
             save_dir / f"violin_internal_{internal_key}.pdf",
             dpi=300,
@@ -134,11 +143,13 @@ def main(
         )
 
         sns.violinplot(data=plot_ext_bal_acc, x="method", y=external_key, ax=ext_axs[i])
-        handles, labels = ext_axs[i].get_legend_handles_labels()
+        # handles, labels = ext_axs[i].get_legend_handles_labels()
         ext_axs[i].set_xlabel("Data Augmentation Methods")
-        ext_axs[i].set_ylabel("External Balanced Accuracy")
+        # ext_axs[i].set_ylabel("External Balanced Accuracy")
+        ext_axs[i].set_ylabel("External ROC-AUC Score")
         ext_axs[i].set_title(f"Class Size : {size}")
         # ext_axs[i].set_ylim([0.3,0.9])
+
         ext_axs[i].set_xticklabels(
             methods, rotation=45, ha="right", rotation_mode="anchor"
         )
