@@ -33,60 +33,85 @@ class CrossoverSampling(BaseSampler):
                 "global_crossover": self.interclass_sampling,
             }
         )
-    
-    def preprocess_signatures(self, subtype: str, overlapping_genes:List[str]) -> Dict[str, List[str]]:
+
+    def preprocess_signatures(
+        self, subtype: str, overlapping_genes: List[str]
+    ) -> Dict[str, List[str]]:
         processed_subtype_to_signature = deepcopy(self.target_signatures)
         dominant_signature = processed_subtype_to_signature.pop(subtype)
         dominant_signature_as_set = set(dominant_signature)
-        
+
         for gene in overlapping_genes:
-            subtypes_with_gene = [subtype_ for subtype_, signature in processed_subtype_to_signature.items() if gene in signature]
+            subtypes_with_gene = [
+                subtype_
+                for subtype_, signature in processed_subtype_to_signature.items()
+                if gene in signature
+            ]
             if len(subtypes_with_gene) > 1:
                 chosen_subtype = np.random.choice(subtypes_with_gene)
                 subtypes_with_gene.remove(chosen_subtype)
                 for current_subtype in subtypes_with_gene:
-                    updated_signature = [feature for feature in processed_subtype_to_signature[current_subtype] if feature != gene]
-                    processed_subtype_to_signature.update({current_subtype: updated_signature})
-        
+                    updated_signature = [
+                        feature
+                        for feature in processed_subtype_to_signature[current_subtype]
+                        if feature != gene
+                    ]
+                    processed_subtype_to_signature.update(
+                        {current_subtype: updated_signature}
+                    )
+
         processed_subtype_to_signature = {
-            current_subtype: [feature for feature in signature if feature not in dominant_signature_as_set]
+            current_subtype: [
+                feature
+                for feature in signature
+                if feature not in dominant_signature_as_set
+            ]
             for current_subtype, signature in processed_subtype_to_signature.items()
         }
-        
+
         processed_subtype_to_signature[subtype] = dominant_signature
         return processed_subtype_to_signature
-    
-    def preprocess_correlated_signatures(self, subtype: str, overlapping_genes:List[str]) -> Dict[str, List[str]]:
+
+    def preprocess_correlated_signatures(
+        self, subtype: str, overlapping_genes: List[str]
+    ) -> Dict[str, List[str]]:
         processed_subtype_to_signature = deepcopy(self.target_signatures)
         dominant_signature = processed_subtype_to_signature.pop(subtype)
         dominant_signature_as_set = set(dominant_signature)
-        
+
         # for gene in overlapping_genes:
         subtypes_with_overlapping_genes = []
         for subtype_, signature in processed_subtype_to_signature.items():
-            if '\t'.join(map(str, overlapping_genes)) in '\t'.join(map(str, signature)):
-                subtypes_with_overlapping_genes.append(subtype_) 
+            if "\t".join(map(str, overlapping_genes)) in "\t".join(map(str, signature)):
+                subtypes_with_overlapping_genes.append(subtype_)
         if len(subtypes_with_overlapping_genes) > 1:
             chosen_subtype = np.random.choice(subtypes_with_overlapping_genes)
             subtypes_with_overlapping_genes.remove(chosen_subtype)
             for current_subtype in subtypes_with_overlapping_genes:
-                updated_signature = [feature for feature in processed_subtype_to_signature[current_subtype] if feature not in overlapping_genes]
-                processed_subtype_to_signature.update({current_subtype: updated_signature})
-    
+                updated_signature = [
+                    feature
+                    for feature in processed_subtype_to_signature[current_subtype]
+                    if feature not in overlapping_genes
+                ]
+                processed_subtype_to_signature.update(
+                    {current_subtype: updated_signature}
+                )
+
         processed_subtype_to_signature = {
-            current_subtype: [feature for feature in signature if feature not in dominant_signature_as_set]
+            current_subtype: [
+                feature
+                for feature in signature
+                if feature not in dominant_signature_as_set
+            ]
             for current_subtype, signature in processed_subtype_to_signature.items()
         }
-        
+
         processed_subtype_to_signature[subtype] = dominant_signature
         return processed_subtype_to_signature
 
+    @time_func(method_name="interclass_sampling")
     def interclass_sampling(
-        self,
-        X: pd.DataFrame,
-        y: pd.DataFrame,
-        target: str,
-        **kwargs
+        self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs
     ) -> Tuple:
         """Inter-Class Crossover sampling method. Sampling inspired by chromosomal
         crossing over where there is a "crossover" between samples at the gene signature
@@ -124,7 +149,7 @@ class CrossoverSampling(BaseSampler):
         sampled_labels = pd.DataFrame(columns=[target])
         row_idx = []
         sampled_df_list = []
-        overlapping_genes = kwargs.get("overlapping_genes",[])
+        overlapping_genes = kwargs.get("overlapping_genes", [])
 
         if isinstance(self.class_size, int):
             target_size_dict = dict.fromkeys(target_list, self.class_size)
@@ -133,9 +158,11 @@ class CrossoverSampling(BaseSampler):
             target_size_dict = dict(class_key_values)
         elif isinstance(self.class_size, dict):
             target_size_dict = self.class_size
-        
+
         # NOTE: doing this row wise per class-block, so we sample all indices for class1
-        size_list = []  # - to keep track of class sizes for indexing in new augmented df
+        size_list = (
+            []
+        )  # - to keep track of class sizes for indexing in new augmented df
         for item in target_list:
             row_idx = []
 
@@ -167,7 +194,6 @@ class CrossoverSampling(BaseSampler):
             new_labels = pd.DataFrame({target: [item] * size})
             sampled_labels = pd.concat([sampled_labels, new_labels])
 
-
         sampling_idx = sampling_idx.reset_index(drop=True)
         sampled_labels = sampled_labels.reset_index(drop=True)
 
@@ -179,7 +205,7 @@ class CrossoverSampling(BaseSampler):
             if size_list[i] == 0:
                 continue
             sample_indices = sampling_idx.loc[
-                start_index:(start_index+size_list[i])-1, item
+                start_index : (start_index + size_list[i]) - 1, item
             ]
             if sample_indices.dtype == int:
                 sample_indices = sample_indices.astype(str)
@@ -188,17 +214,20 @@ class CrossoverSampling(BaseSampler):
 
             ref_sample_index.append(sample_indices)
             start_index = size_list[i]
-            
-            current_subset_to_fill = sampling_idx.loc[sampled_labels[target]==item,:]
-            
-            
-            processed_signatures = self.preprocess_correlated_signatures(item, overlapping_genes)
+
+            current_subset_to_fill = sampling_idx.loc[sampled_labels[target] == item, :]
+
+            processed_signatures = self.preprocess_correlated_signatures(
+                item, overlapping_genes
+            )
             subsampled_df_list = []
             for k, v in processed_signatures.items():
                 subsampled_df_list.append(
-                    ref_df.loc[current_subset_to_fill.loc[:, k].values, v].reset_index(drop=True)
+                    ref_df.loc[current_subset_to_fill.loc[:, k].values, v].reset_index(
+                        drop=True
+                    )
                 )
-                    
+
             sampled_df_list.append(pd.concat(subsampled_df_list, axis=1))
 
         sampled_df = pd.concat(sampled_df_list, axis=0)
@@ -213,12 +242,9 @@ class CrossoverSampling(BaseSampler):
 
         return sampled_df, sampled_labels
 
+    @time_func(method_name="intraclass_sampling")
     def intraclass_sampling(
-        self,
-        X: pd.DataFrame,
-        y: pd.DataFrame,
-        target: str,
-        **kwargs
+        self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs
     ):
         target_count = dict(Counter(y[target]))
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
@@ -227,9 +253,9 @@ class CrossoverSampling(BaseSampler):
 
         sampled_df = pd.DataFrame()
         sampled_labels = pd.DataFrame()
-        
+
         target_list = sorted(list(self.target_signatures.keys()))
-        overlapping_genes = kwargs.get("overlapping_genes",[])
+        overlapping_genes = kwargs.get("overlapping_genes", [])
         if isinstance(self.class_size, int):
             target_size_dict = dict.fromkeys(target_list, self.class_size)
         elif isinstance(self.class_size, list):
@@ -263,8 +289,10 @@ class CrossoverSampling(BaseSampler):
             if ref_sample_index.dtype == int:
                 ref_sample_index = ref_sample_index.astype(str)
             ref_sample_index = ref_sample_index + "S"
-            processed_signatures = self.preprocess_correlated_signatures(k, overlapping_genes)
-            
+            processed_signatures = self.preprocess_correlated_signatures(
+                k, overlapping_genes
+            )
+
             for key, value in processed_signatures.items():
                 idx = subset.index[sampling_idx.loc[:, key]]
                 # value = set(A)-set(B)?
@@ -276,15 +304,15 @@ class CrossoverSampling(BaseSampler):
             new_samples.index = new_samples.index.astype(str) + new_samples.groupby(
                 "id"
             ).cumcount().astype(str)
-            
+
             new_samples = new_samples.loc[:, X.columns]
             new_labels = pd.DataFrame({target: [k] * size}, index=new_samples.index)
-            
+
             sampled_df = pd.concat([sampled_df, new_samples])
             sampled_labels = pd.concat([sampled_labels, new_labels])
 
         return sampled_df, sampled_labels
-    @time_func
+
     def sample(self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs):
         sampled_df, sampled_labels = self.get_samples[self.sampling_method](
             X, y, target, **kwargs
