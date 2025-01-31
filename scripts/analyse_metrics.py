@@ -64,7 +64,7 @@ sns.set(font="Helvetica")
     "--sampling_methods",
     type=str,
     help="Pass a list of sampling methods as a string. Eg '[]'",
-    default='["gamma_poisson","global_crossover","local_crossover","poisson","replacement","smote","unaugmented"]',
+    default='["gamma_poisson",  "global_crossover","local_crossover","poisson","replacement","smote","unaugmented"]',
 )
 @click.option(
     "--class_sizes",
@@ -146,7 +146,7 @@ def main(
         # handles, labels = ext_axs[i].get_legend_handles_labels()
         ext_axs[i].set_xlabel("Data Augmentation Methods")
         # ext_axs[i].set_ylabel("External Balanced Accuracy")
-        ext_axs[i].set_ylabel("External ROC-AUC Score")
+        ext_axs[i].set_ylabel("ROC-AUC Score")
         ext_axs[i].set_title(f"Class Size : {size}")
         # ext_axs[i].set_ylim([0.3,0.9])
 

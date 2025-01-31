@@ -18,8 +18,10 @@ from signature_sampling.hyperparameter_factory import CLASSIFIER_FACTORY
 from signature_sampling.torch_data import TCGADataset
 
 warnings.filterwarnings("ignore")
-
+seed = 42
 parser = argparse.ArgumentParser()
+np.random.seed(seed)
+torch.manual_seed(seed)
 
 
 def run_clf(
@@ -29,10 +31,10 @@ def run_clf(
     sampling_methods: Iterable,
     params_path: Path,
     size: str,
-    label: str = "cms",
+    label: str = "PAM50",
     folds: int = 5,
     repeats: int = 5,
-    cptac: bool = True,
+    external: str = "tcga_ext",
     **kwargs,
 ) -> None:
     """Saves results from classification experiment in csv format in the designated folder.
@@ -47,7 +49,7 @@ def run_clf(
             Defaults to "cms".
         folds (int, optional): Number of cross validation folds. Defaults to 5.
         repeats (int, optional): Number of cross validation repetitions. Defaults to 5.
-        cptac (bool, optional): Whether to run the experiment on cptac data. Defaults to True.
+        external (bool, optional): Whether to run the experiment on external data. Defaults to True.
     """
     result_dir = os.path.join(result_root_dir, model)
     os.makedirs(os.path.join(result_dir, "summary_results"), exist_ok=True)
@@ -62,23 +64,23 @@ def run_clf(
     std_scores = []
     mean_acc = []
     std_acc = []
-    cptac_mean_scores = []
-    cptac_std_scores = []
-    cptac_mean_acc = []
-    cptac_std_acc = []
+    external_mean_scores = []
+    external_std_scores = []
+    external_mean_acc = []
+    external_std_acc = []
     size_copy = size
     mean_metrics = pd.DataFrame(
-        columns=["roc-auc", "bal_acc", "cptac_roc-auc", "cptac_bal_acc"],
+        columns=["roc-auc", "bal_acc", "external_roc-auc", "external_bal_acc"],
         index=sampling_methods,
     )
 
     for sampling in sampling_methods:
         scores = []
         acc = []
-        cptac_scores = []
-        cptac_acc = []
+        external_scores = []
+        external_acc = []
         metrics = pd.DataFrame(
-            columns=["roc-auc", "bal_acc", "cptac_roc-auc", "cptac_bal_acc"]
+            columns=["roc-auc", "bal_acc", "external_roc-auc", "external_bal_acc"]
         )
 
         if sampling == "unaugmented":
@@ -89,12 +91,19 @@ def run_clf(
         for i in range(1, (folds * repeats) + 1):
             os.makedirs(os.path.join(save_dir, f"split_{i}"), exist_ok=True)
             main_dir = data_dir / f"{sampling}" / size
-            xtrain_path = main_dir / f"{i}/train_logfpkm_colotype_stdz.csv"
-            ytrain_path = main_dir / f"{i}/train_labels_logfpkm_colotype.csv"
-            xval_path = main_dir / f"{i}/valid_logfpkm_colotype_stdz.csv"
-            yval_path = main_dir / f"{i}/valid_labels_logfpkm_colotype.csv"
-            xtest_path = main_dir / f"{i}/test_logfpkm_colotype_stdz.csv"
-            ytest_path = main_dir / f"{i}/test_labels_colotype_stdz.csv"
+            xtrain_path = main_dir / f"{i}/train_logfpkm_stdz.csv"
+            ytrain_path = main_dir / f"{i}/train_labels_logfpkm.csv"
+            xval_path = main_dir / f"{i}/valid_logfpkm_stdz.csv"
+            yval_path = main_dir / f"{i}/valid_labels_logfpkm.csv"
+            xtest_path = main_dir / f"{i}/test_logfpkm_stdz.csv"
+            ytest_path = main_dir / f"{i}/test_labels_stdz.csv"
+
+            # xtrain_path = main_dir / f"{i}/train_logrma_stdz.csv"
+            # ytrain_path = main_dir / f"{i}/train_labels_logrma.csv"
+            # xval_path = main_dir / f"{i}/valid_logrma_stdz.csv"
+            # yval_path = main_dir / f"{i}/valid_labels_logrma.csv"
+            # xtest_path = main_dir / f"{i}/test_logrma_stdz.csv"
+            # ytest_path = main_dir / f"{i}/test_labels_stdz.csv"
 
             train_df = pd.read_csv(xtrain_path, index_col=0)
             train_labels = pd.read_csv(ytrain_path, index_col=0)
@@ -109,15 +118,15 @@ def run_clf(
             y_val = valid_labels[label]
             y_test = test_labels[label]
 
+            assert all(y_train.index == train_df.index)
+            assert all(y_val.index == valid_df.index)
+            assert all(y_test.index == test_df.index)
+
             if any(pd.isna(y_train)):
                 drop_idx = np.argwhere(pd.isna(y_train.values))
                 drop_idx = drop_idx.flatten()
                 train_df = train_df.drop(index=train_df.index[drop_idx])
                 y_train = y_train.drop(index=y_train.index[drop_idx])
-
-            # single param json, with params_LR, etc for each model
-            # do **params_LR to init the clf and make it ready for fit
-            # TODO: convert data to numpy and labels to int with labelencoder
 
             # self.dataset = torch.tensor(self.dataset, dtype=torch.float).to(device)
 
@@ -173,53 +182,57 @@ def run_clf(
             scores.append(auc)
             acc.append(bal_acc)
 
-            if cptac:
-                cptac_label = str.upper(label)
-                cptac_df = pd.read_csv(
-                    os.path.join(data_dir, f"{sampling}", size, f"{i}/cptac_stdz.csv"),
-                    index_col=0,
-                )
-                cptac_labels = pd.read_csv(
+            if external:
+                external_label = str.upper(label)
+                external_df = pd.read_csv(
                     os.path.join(
-                        data_dir, f"{sampling}", size, f"{i}/cptac_labels.csv"
+                        data_dir, f"{sampling}", size, f"{i}/{external}_stdz.csv"
                     ),
                     index_col=0,
                 )
-
-                cptac_preds = clf.predict(cptac_df.to_numpy(dtype=np.float32))
-                cptac_prob_preds = clf.predict_proba(
-                    cptac_df.to_numpy(dtype=np.float32)
+                external_np_array = external_df.to_numpy(dtype=np.float32)
+                external_labels = pd.read_csv(
+                    os.path.join(
+                        data_dir, f"{sampling}", size, f"{i}/{external}_labels.csv"
+                    ),
+                    index_col=0,
                 )
-                # CPTAC
-                drop_idx = np.argwhere(pd.isna(cptac_labels[cptac_label].values))
-                keep_idx = np.setdiff1d(np.arange(len(cptac_preds)), drop_idx)
+                external_labels = external_labels.rename(
+                    columns={external_labels.columns[0]: external_label}
+                )
 
-                cptac_pred_mod = cptac_preds[keep_idx]
-                cptac_true_labels = cptac_labels[cptac_label][keep_idx]
+                external_preds = clf.predict(external_np_array)
+                external_prob_preds = clf.predict_proba(external_np_array)
+                # external
+                drop_idx = np.argwhere(pd.isna(external_labels[external_label].values))
+                keep_idx = np.setdiff1d(np.arange(len(external_preds)), drop_idx)
+
+                external_pred_mod = external_preds[keep_idx]
+                external_true_labels = external_labels[external_label][keep_idx]
                 if model == "MLP":
-                    cptac_true_labels = train_dataset.label_embedder.transform(
-                        cptac_true_labels
+                    external_true_labels = train_dataset.label_embedder.transform(
+                        external_true_labels
                     )
-                cptac_auc = roc_auc_score(
-                    cptac_true_labels,
-                    cptac_prob_preds[keep_idx],
+                external_auc = roc_auc_score(
+                    external_true_labels,
+                    external_prob_preds[keep_idx],
                     multi_class="ovr",
                 )
-                cptac_bal_acc = sm.balanced_accuracy_score(
-                    cptac_true_labels, cptac_pred_mod
+                external_bal_acc = sm.balanced_accuracy_score(
+                    external_true_labels, external_pred_mod
                 )
-                cptac_scores.append(cptac_auc)
-                cptac_acc.append(cptac_bal_acc)
+                external_scores.append(external_auc)
+                external_acc.append(external_bal_acc)
 
         metrics["roc-auc"] = scores
         metrics["bal_acc"] = acc
-        if cptac:
-            metrics["cptac_roc-auc"] = cptac_scores
-            metrics["cptac_bal_acc"] = cptac_acc
-            cptac_mean_scores.append(np.mean(cptac_scores))
-            cptac_std_scores.append(np.std(cptac_scores))
-            cptac_mean_acc.append(np.mean(cptac_acc))
-            cptac_std_acc.append(np.std(cptac_acc))
+        if external:
+            metrics["external_roc-auc"] = external_scores
+            metrics["external_bal_acc"] = external_acc
+            external_mean_scores.append(np.mean(external_scores))
+            external_std_scores.append(np.std(external_scores))
+            external_mean_acc.append(np.mean(external_acc))
+            external_std_acc.append(np.std(external_acc))
 
         metrics.to_csv(os.path.join(result_dir, f"{sampling}", size, "metrics.csv"))
 
@@ -232,11 +245,11 @@ def run_clf(
     mean_metrics["std_roc-auc"] = std_scores
     mean_metrics["bal_acc"] = mean_acc
     mean_metrics["std_bal_acc"] = std_acc
-    if cptac:
-        mean_metrics["cptac_roc-auc"] = cptac_mean_scores
-        mean_metrics["cptac_std_roc-auc"] = cptac_std_scores
-        mean_metrics["cptac_bal_acc"] = cptac_mean_acc
-        mean_metrics["cptac_std_bal_acc"] = cptac_std_acc
+    if external:
+        mean_metrics["external_roc-auc"] = external_mean_scores
+        mean_metrics["external_std_roc-auc"] = external_std_scores
+        mean_metrics["external_bal_acc"] = external_mean_acc
+        mean_metrics["external_std_bal_acc"] = external_std_acc
 
     mean_metrics.to_csv(
         os.path.join(result_dir, f"summary_results/mean_metrics_{size_copy}.csv")
@@ -253,16 +266,35 @@ parser.add_argument(
     help="Path to the directory where results will be saved.",
 )
 parser.add_argument(
-    "seed", type=int, help="Seed for numpy and torch, esp for mlp skorch."
+    "label", type=str, help="Name of target column to use for the classification task."
+)
+parser.add_argument(
+    "external", type=str, help="Name of external dataset used for validation."
+)
+parser.add_argument("folds", type=int, default=5, help="Number of CV folds.")
+parser.add_argument("repeats", type=int, default=5, help="Number of CV repeats.")
+parser.add_argument(
+    "seed", type=int, default=seed, help="Seed for numpy and torch, esp for mlp skorch."
 )
 
 
-def main(data_dir: str, params_path: str, result_root_dir: str, seed: int):
+def main(
+    data_dir: str,
+    params_path: str,
+    result_root_dir: str,
+    label: str,
+    external: str,
+    folds: int = 5,
+    repeats: int = 5,
+    seed: int = 42,
+):
     np.random.seed(seed)
     torch.manual_seed(seed)
 
     sampling_methods = [
         "poisson",
+        "unmod_poisson",
+        "unmod_gamma_poisson",
         "gamma_poisson",
         "local_crossover",
         "global_crossover",
@@ -270,13 +302,32 @@ def main(data_dir: str, params_path: str, result_root_dir: str, seed: int):
         "replacement",
         "unaugmented",
     ]
-    for model in ["MLP", "RF", "Logistic", "SVM-RBF", "KNN", "EBM"]:
-        for size in ["max", "500", "5000"]:
+
+    for model in ["Logistic", "KNN", "RF", "EBM", "SVM-RBF", "MLP"]:
+        for size in ["max", "50", "500"]:
             run_clf(
-                model, data_dir, result_root_dir, sampling_methods, params_path, size
+                model,
+                data_dir,
+                result_root_dir,
+                sampling_methods,
+                params_path,
+                size,
+                label,
+                external,
+                folds,
+                repeats,
             )
 
 
 if __name__ == "__main__":
     args = parser.parse_args()
-    main(args.data_dir, args.params_path, args.result_root_dir, args.seed)
+    main(
+        args.data_dir,
+        args.params_path,
+        args.result_root_dir,
+        args.label,
+        args.external,
+        args.folds,
+        args.repeats,
+        args.seed,
+    )

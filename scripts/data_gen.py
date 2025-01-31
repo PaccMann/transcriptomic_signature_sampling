@@ -112,14 +112,14 @@ def main(
 
     # TODO: add primary tumour check
 
-    if os.path.exists(colotype_path):
-        colotype_genes = pd.read_csv(colotype_path)
-    else:
-        colotype_genes = dict()
+    if os.path.exists(signature_path):
+        signature_genes_df = pd.read_csv(signature_path)
 
-    signature_genes = dict(
-        colotype_genes.groupby("subtype").apply(lambda x: x[gene_type].values)
-    )
+        signature_genes = dict(
+            signature_genes_df.groupby("subtype").apply(lambda x: x[gene_type].values)
+        )
+    else:
+        signature_genes = dict()
 
     splits = len(cv_splits.keys())
 
@@ -141,7 +141,16 @@ def main(
             save_path = save_dir / f"{i+1}"
             sampler = SAMPLING_FACTORY[sampling_method](sampling_method, class_size)
             sampler.init_target_signatures(signature_genes)
-            sampled_df, sampled_labels = sampler.sample(train_df, train_labels, target, **{'gamma_poisson_r':5, 'poisson_r':5, 'overlapping_genes':['MCM2','MKI67']})
+            sampled_df, sampled_labels = sampler.sample(
+                train_df,
+                train_labels,
+                target,
+                **{
+                    "gamma_poisson_r": 5,
+                    "poisson_r": 5,
+                    # "overlapping_genes": ["MCM2", "MKI67"],
+                },
+            )
             augmented_df = pd.concat([train_df, sampled_df])
             augmented_labels = pd.concat([train_labels, sampled_labels])
             shuffle_idx = np.random.permutation(range(len(augmented_df)))
@@ -181,12 +190,8 @@ def main(
         joblib.dump(scaler, save_path / "scaler.pkl")
 
         # save augmented logfpkm data and stdz params
-        train_augmented_fpkm_df_stdz.to_csv(
-            save_path / "train_logfpkm_stdz.csv"
-        )
-        valid_augmented_fpkm_df_stdz.to_csv(
-            save_path / "valid_logfpkm_stdz.csv"
-        )
+        train_augmented_fpkm_df_stdz.to_csv(save_path / "train_logfpkm_stdz.csv")
+        valid_augmented_fpkm_df_stdz.to_csv(save_path / "valid_logfpkm_stdz.csv")
         ytrain.to_csv(os.path.join(save_path, "train_labels_logfpkm.csv"))
         yval.to_csv(os.path.join(save_path, "valid_labels_logfpkm.csv"))
 
