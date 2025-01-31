@@ -35,7 +35,7 @@ class BaseSampler:
             "poisson": self.poisson_local_mean,
             "replacement": self.replacement_sampler,
             "gamma_poisson": self.gamma_poisson_sampler,
-            "unmod_gamma_poisson": self.gamma_poisson_unmod
+            "unmod_gamma_poisson": self.gamma_poisson_unmod,
         }
 
     def init_target_signatures(self, target_signatures: dict):
@@ -90,7 +90,7 @@ class BaseSampler:
             index=[f"{project}-{target_class}-S{i}" for i in range(length)],
             columns=X.columns,
         )
-    
+
     def poisson_local_mean(
         self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
@@ -165,7 +165,7 @@ class BaseSampler:
 
         samples = []
         project = X.index[0].split("-")[0]
-    
+
         mean = X.mean().values
         var = X.var().values
         mu = mu_gammapoisson(mean, var)
@@ -178,7 +178,7 @@ class BaseSampler:
             index=[f"{project}-{target_class}-S{i}" for i in range(length)],
             columns=X.columns,
         )
-    
+
     def gamma_poisson_sampler(
         self, X: pd.DataFrame, length: int, target_class: str, **kwargs
     ) -> pd.DataFrame:
@@ -257,14 +257,9 @@ class BaseSampler:
         ref_sample = X.iloc[random_idx, :]
         ref_sample.index = ref_sample.index + [f"S{i}" for i in range(length)]
         return ref_sample
-    @time_func
-    def sample(
-        self,
-        X: pd.DataFrame,
-        y: pd.DataFrame,
-        target: str,
-        **kwargs
-    ) -> Tuple:
+
+    @time_func(method_name=lambda self: self.sampling_method)
+    def sample(self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs) -> Tuple:
         """Main method to generate augmented datasets.
 
         Args:
@@ -301,8 +296,10 @@ class BaseSampler:
             subset = X.iloc[subset_idx, :]
             size = max_count - v if self.class_size is None else self.class_size - v
             # size = max_count - v if self.class_size is None else self.class_size # if you want to sample specified dset_size samples
-            
-            new_samples = self.get_samples[self.sampling_method](subset, size, k, **kwargs)
+
+            new_samples = self.get_samples[self.sampling_method](
+                subset, size, k, **kwargs
+            )
 
             new_labels = pd.DataFrame({target: [k] * size}, index=new_samples.index)
 
@@ -315,7 +312,8 @@ class BaseSampler:
 class SMOTESampler(BaseSampler):
     def __init__(self, sampling_method: str, class_size: int) -> None:
         super().__init__(sampling_method, class_size)
-    @time_func
+
+    @time_func(method_name="smote")
     def sample(self, X: pd.DataFrame, y: pd.DataFrame, target: str, **kwargs) -> Tuple:
         """Synthetic Minority Oversampling Technique.
 
