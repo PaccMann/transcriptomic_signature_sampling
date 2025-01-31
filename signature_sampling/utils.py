@@ -1,8 +1,11 @@
+import csv
 import functools
 import json
 import os
 import random
 import time
+from collections import defaultdict
+from datetime import datetime
 from pathlib import Path
 from random import sample
 from typing import Callable, Dict, Iterable, List, Tuple
@@ -136,7 +139,7 @@ def load_model(model_name: str, model_path: str) -> Callable:
     Returns:
         Loaded model.
     """
-    
+
     saved_model_params_path = os.path.join(model_path, "params.json")
     saved_model = os.path.join(model_path, "weights")
 
@@ -194,10 +197,10 @@ def get_decoded_embeddings(
     Args:
         model (Callable): Model to load and decode latent embeddings.
         latent_embedding (torch.Tensor): Latent embeddings.
-        
+
     Returns:
         torch.Tensor: Reconstructed embeddings.
-    """ 
+    """
     model.eval()
     decoded_embedding = model.decoder(latent_embedding)
     reconstructed_embedding = model.final_layer(decoded_embedding)
@@ -246,14 +249,15 @@ def get_train_splits_idx(features, labels, splits=5, repeats=5, seed=42) -> Dict
     rskf = RepeatedStratifiedKFold(
         n_splits=splits, n_repeats=repeats, random_state=seed
     )
-    
+
     for i, (train_index, test_index) in enumerate(rskf.split(features, labels)):
         train_samples = features.index[train_index].values.tolist()
         test_samples = features.index[test_index].values.tolist()
-        assert not np.array_equal(train_samples,test_samples)
+        assert not np.array_equal(train_samples, test_samples)
         split_idx[i] = {"train": train_samples, "test": test_samples}
-        
+
     return split_idx
+
 
 def stdz_external_dataset(
     scaler: sklearn.preprocessing,
@@ -267,7 +271,7 @@ def stdz_external_dataset(
     Args:
         scaler: Scaler object with transform function.
         external_name: Name of external dataset.
-        external_df: External dataframe to standardise. 
+        external_df: External dataframe to standardise.
         external_labels: Labels associated with external data.
         save_dir: Directory where standardised external data willbe saved.
     """
@@ -294,21 +298,95 @@ def save_dict(dictionary: dict, save_path: str) -> None:
     with open(save_path, "w") as f:
         json.dump(dictionary, f)
 
-def time_func(func):
-    """Wrapper function to time functions.
+
+# def time_func(func):
+#     """Wrapper function to time functions.
+
+#     Args:
+#         func: Function to be timed.
+
+#     Returns:
+#         Wrapper function that measures runtime of a function.
+#     """
+
+#     @functools.wraps(func)
+#     def wrapper_timer(*args, **kwargs):
+#         tic = time.perf_counter()
+#         value = func(*args, **kwargs)
+#         toc = time.perf_counter()
+#         elapsed_time = toc - tic
+#         print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+#         return value
+
+#     return wrapper_timer
+
+
+# Global counter to track splits for each method
+_method_split_counters = defaultdict(int)
+
+
+def time_func(method_name, csv_path="timing_results.csv"):
+    """Wrapper function to time functions and save results to CSV with automatic split tracking.
 
     Args:
-        func: Function to be timed.
+        method_name (str): Name of the method being timed (e.g., 'random_oversampling')
+        csv_path (str, optional): Path to the CSV file for saving timing results.
 
     Returns:
-        Wrapper function that measures runtime of a function.
+        Wrapper function that measures runtime of a function and logs to CSV.
     """
-    @functools.wraps(func)
-    def wrapper_timer(*args, **kwargs):
-        tic = time.perf_counter()
-        value = func(*args, **kwargs)
-        toc = time.perf_counter()
-        elapsed_time = toc - tic
-        print(f"Elapsed time: {elapsed_time:0.4f} seconds")
-        return value
-    return wrapper_timer
+
+    def decorator(func):
+        @functools.wraps(func)
+        def wrapper_timer(self, *args, **kwargs):
+            current_method = method_name(self) if callable(method_name) else method_name
+            global _method_split_counters
+
+            # Increment split counter for this method
+            current_split = _method_split_counters[current_method]
+            _method_split_counters[current_method] += 1
+
+            # Time the function
+            tic = time.perf_counter()
+            value = func(self, *args, **kwargs)
+            toc = time.perf_counter()
+            elapsed_time = toc - tic
+
+            # Print timing information
+            print(f"Method: {current_method}, Split: {current_split}")
+            print(f"Elapsed time: {elapsed_time:0.4f} seconds")
+
+            # Prepare CSV data
+            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            csv_data = {
+                "timestamp": timestamp,
+                "method": current_method,
+                "split": current_split,
+                "elapsed_time": f"{elapsed_time:0.4f}",
+            }
+
+            # Create CSV file with headers if it doesn't exist
+            file_exists = os.path.isfile(csv_path)
+
+            with open(csv_path, mode="a", newline="") as file:
+                writer = csv.DictWriter(
+                    file, fieldnames=["timestamp", "method", "split", "elapsed_time"]
+                )
+
+                if not file_exists:
+                    writer.writeheader()
+
+                writer.writerow(csv_data)
+
+            return value
+
+        return wrapper_timer
+
+    return decorator
+
+
+# Optional: Function to reset split counters if needed
+def reset_split_counters():
+    """Reset all method split counters to 0."""
+    global _method_split_counters
+    _method_split_counters.clear()
