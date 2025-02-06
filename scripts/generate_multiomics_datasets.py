@@ -82,7 +82,7 @@ def get_fpkm_from_count(
 
 
 probemap = pd.read_csv(
-    "/Users/nja/Desktop/Sinergia/data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
+    "~/data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
     sep="\t",
 )
 # probemap.index = probemap.id
@@ -91,20 +91,18 @@ probemap["length"] = probemap.chromEnd - probemap.chromStart
 probemap = probemap.replace({"WARS": "WARS1"})
 probemap = probemap.set_index("gene")
 
-save_dir = Path("/Users/nja/Desktop/Sinergia/unicode_multiomics/data")
+save_dir = Path("~/unicode_multiomics/data")
 
-rnaseq_counts_coad = "/Users/nja/Desktop/Sinergia/data/gdc_coad/gene_expression/TCGA-COAD.htseq_counts.tsv.gz"
-rnaseq_counts_read = "/Users/nja/Desktop/Sinergia/data/gdc_read/gene_expression/TCGA-READ.htseq_counts.tsv.gz"
-dnameth_coadread_450k = "/Users/nja/Desktop/Sinergia/data/tcga_coadread/dna_methylation/HumanMethylation450.gz"
-mirna_coad = "/Users/nja/Desktop/Sinergia/data/gdc_coad/TCGA-COAD.mirna.tsv.gz"
-mirna_read = "/Users/nja/Desktop/Sinergia/data/gdc_read/TCGA-READ.mirna.tsv.gz"
-rppa_coadread = "/Users/nja/Desktop/Sinergia/data/tcga_coadread/RPPA_RBN.gz"
+rnaseq_counts_coad = "~/data/gdc_coad/gene_expression/TCGA-COAD.htseq_counts.tsv.gz"
+rnaseq_counts_read = "~/data/gdc_read/gene_expression/TCGA-READ.htseq_counts.tsv.gz"
+dnameth_coadread_450k = "~/data/tcga_coadread/dna_methylation/HumanMethylation450.gz"
+mirna_coad = "~/data/gdc_coad/TCGA-COAD.mirna.tsv.gz"
+mirna_read = "~/data/gdc_read/TCGA-READ.mirna.tsv.gz"
+rppa_coadread = "~/data/tcga_coadread/RPPA_RBN.gz"
 
 ## Process RNA-Seq
 
-colotype_genes = pd.read_csv(
-    "/Users/nja/Desktop/Sinergia/data/colotype_gex/colotype_genes.csv", index_col=0
-)
+colotype_genes = pd.read_csv("~/data/colotype_gex/colotype_genes.csv", index_col=0)
 
 rnaseq_counts_coad_df = pd.read_csv(rnaseq_counts_coad, index_col=0, sep="\t").T
 rnaseq_counts_read_df = pd.read_csv(rnaseq_counts_read, index_col=0, sep="\t").T
@@ -322,7 +320,7 @@ merged_cologex_literature_df_innerjoin.to_csv(
 #     "merged_cologex_literature_df_v2.csv",
 # ]
 # merge_how = {files_to_merge[0]: "inner", files_to_merge[1]: "outer"}
-# vit_mean_patch = "/Users/nja/Desktop/Sinergia/data/coadread_data_clustering/vit-wsi_crc_mean_patch.csv"
+# vit_mean_patch = "~/data/coadread_data_clustering/vit-wsi_crc_mean_patch.csv"
 # wsi_df = pd.read_csv(vit_mean_patch, index_col=0)
 # for file in files_to_merge:
 #     filename = "vit-wsi768_unstdz_" + file.split(".")[0] + ".csv"
@@ -332,7 +330,7 @@ merged_cologex_literature_df_innerjoin.to_csv(
 
 ## Generate Label File
 clin_labels_coadread = pd.read_csv(
-    "/Users/nja/Desktop/Sinergia/data/tinder_expts/tcga_colotype_all_labels_clean.csv",
+    "~/data/tinder_expts/tcga_colotype_all_labels_clean.csv",
     index_col=0,
 )
 intersect_idx_innerjoin = list(
