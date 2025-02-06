@@ -294,8 +294,10 @@ class BaseSampler:
                 continue
             subset_idx = np.argwhere(y[target].values == k).flatten()
             subset = X.iloc[subset_idx, :]
-            size = max_count - v if self.class_size is None else self.class_size - v
-            # size = max_count - v if self.class_size is None else self.class_size # if you want to sample specified dset_size samples
+            # size = max_count - v if self.class_size is None else self.class_size - v
+            size = (
+                max_count - v if self.class_size is None else self.class_size
+            )  # if you want to sample specified dset_size samples
 
             new_samples = self.get_samples[self.sampling_method](
                 subset, size, k, **kwargs
