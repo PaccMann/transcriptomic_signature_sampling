@@ -1,6 +1,7 @@
 import math
 import random
 from collections import Counter
+from itertools import combinations
 from typing import Any, Iterable, List, Tuple, Union
 
 import numpy as np
@@ -8,6 +9,7 @@ import pandas as pd
 import torch
 import torch.distributions as td
 from imblearn.over_sampling import SMOTE
+from shap import sample
 from sklearn.preprocessing import LabelEncoder
 
 from signature_sampling.utils import time_func
@@ -199,35 +201,51 @@ class BaseSampler:
             with the specified "cms" label.
         """
 
-        def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
-            """Function sampling the mu parameter from the Gamma-Poisson distribution.
+        # def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
+        #     """Function sampling the mu parameter from the Gamma-Poisson distribution.
 
-            Args:
-                mean (np.ndarray): Array of means to initialise the Gamma distribution.
-                var (np.ndarray): Array of standard deviations to initialise the Gamma
-                distribution.
+        #     Args:
+        #         mean (np.ndarray): Array of means to initialise the Gamma distribution.
+        #         var (np.ndarray): Array of standard deviations to initialise the Gamma
+        #         distribution.
 
-            Returns:
-                List: List of means to intialise the Poisson distribution.
-            """
+        #     Returns:
+        #         List: List of means to intialise the Poisson distribution.
+        #     """
 
-            beta = mean / var
-            alpha = mean * beta
-            gamma = list(map(td.Gamma, alpha, beta))
-            mu = list(map(lambda x: x.sample(), gamma))
-            return mu
+        # beta = mean / var
+        # if any(np.isnan(beta)):
+        # alpha = mean * beta
+        # gamma = list(map(td.Gamma, alpha, beta))
+        # mu = list(map(lambda x: x.sample(), gamma))
+        # return mu
 
         samples = []
         project = X.index[0].split("-")[0]
         r_set_size = kwargs.get("gamma_poisson_r", 5)
-        ref_indices = self.random_combinations(
-            X.index, subset_size=r_set_size, length=length
-        )
+        # ref_indices = self.random_combinations(
+        #     X.index, subset_size=r_set_size, length=length
+        # )
+        # can explode depending on size of X
+        ref_indices = list(combinations(range(len(X.index)), r_set_size))
+        ref_indices = [sorted(item) for item in ref_indices]
+
+        def sample_datapoint(ref_indices, X):
+            ref_index = random.sample(ref_indices, 1)
+            mean = X.iloc[ref_index, :].mean().values
+            var = X.iloc[ref_index, :].var().values
+            beta = mean / var
+            alpha = mean * beta
+            if any(np.isnan(beta)):
+                ref_indices.remove(ref_index)
+                alpha, beta = sample_datapoint(ref_indices, X)
+            return alpha, beta
 
         for i in range(length):
-            mean = X.iloc[ref_indices[i], :].mean().values
-            var = X.iloc[ref_indices[i], :].var().values
-            mu = mu_gammapoisson(mean, var)
+            alpha, beta = sample_datapoint(ref_indices, X)
+            gamma = list(map(td.Gamma, alpha, beta))
+            mu = list(map(lambda x: x.sample(), gamma))
+            # mu = mu_gammapoisson(mean, var)
             poisson = list(map(td.Poisson, mu))
             samples.append(list(map(lambda x: x.sample().item(), poisson)))
 
