@@ -202,16 +202,13 @@ class BaseSampler:
         """
 
         def sample_datapoint(ref_indices, X):
-            print("1", len(ref_indices))
             ref_index = random.sample(ref_indices, 1)[0]
-            print(ref_index)
             mean = X.iloc[ref_index, :].mean().values
             var = X.iloc[ref_index, :].var().values
             beta = mean / var
             alpha = mean * beta
             if any(np.isnan(beta)):
                 ref_indices.remove(ref_index)
-                print("2", len(ref_indices))
                 alpha, beta = sample_datapoint(ref_indices, X)
             return alpha, beta
 
