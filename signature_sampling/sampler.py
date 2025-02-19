@@ -199,17 +199,16 @@ class BaseSampler:
             pd.DataFrame: Dataframe of only newly generated samples from the
             Gamma-Poisson distribution
             with the specified "cms" label.
+        NOTE: alpha - shape, beta - rate
         """
 
-        def sample_datapoint(ref_indices, X):
-            ref_index = random.sample(ref_indices, 1)[0]
-            mean = X.iloc[ref_index, :].mean().values
-            var = X.iloc[ref_index, :].var().values
+        def estimate_gamma_parameters(
+            ref_indices: List[int], X: pd.DataFrame
+        ) -> Tuple[float, float]:
+            mean = X.iloc[ref_indices, :].mean().values
+            var = X.iloc[ref_indices, :].var().values
             beta = mean / var
             alpha = mean * beta
-            if any(np.isnan(beta)):
-                ref_indices.remove(ref_index)
-                alpha, beta = sample_datapoint(ref_indices, X)
             return alpha, beta
 
         # def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
@@ -234,20 +233,18 @@ class BaseSampler:
         samples = []
         project = X.index[0].split("-")[0]
         r_set_size = kwargs.get("gamma_poisson_r", 5)
-        # ref_indices = self.random_combinations(
-        #     X.index, subset_size=r_set_size, length=length
-        # )
-        # can explode depending on size of X
-        ref_indices = list(combinations(range(len(X.index)), r_set_size))
-        ref_indices = [sorted(item) for item in ref_indices]
 
-        for i in range(length):
-            alpha, beta = sample_datapoint(ref_indices, X)
-            gamma = list(map(td.Gamma, alpha, beta))
-            mu = list(map(lambda x: x.sample(), gamma))
-            # mu = mu_gammapoisson(mean, var)
-            poisson = list(map(td.Poisson, mu))
-            samples.append(list(map(lambda x: x.sample().item(), poisson)))
+        elements = list(range(X.shape[0]))
+
+        while len(samples) < length:
+            # NOTE: a way to sample indices quickly and randomly (~19 us)
+            random.shuffle(elements)
+            ref_indices = list(next(combinations(elements, r_set_size)))
+            alpha, beta = estimate_gamma_parameters(ref_indices, X)
+            gamma = [td.Gamma(a, b) for a, b in zip(alpha, beta)]
+            mu = [g.sample() for g in gamma]
+            poisson = [td.Poisson(rate) for rate in mu]
+            samples.append([p.sample().item() for p in poisson])
 
         return pd.DataFrame(
             samples,
