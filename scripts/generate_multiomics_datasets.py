@@ -6,6 +6,7 @@ from typing import List
 import numpy as np
 import pandas as pd
 from numpy.typing import ArrayLike
+from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
 
@@ -81,8 +82,10 @@ def get_fpkm_from_count(
     return fpkm_df
 
 
+root_dir = Path("")
+
 probemap = pd.read_csv(
-    "~/data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
+    root_dir / "data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
     sep="\t",
 )
 # probemap.index = probemap.id
@@ -91,18 +94,27 @@ probemap["length"] = probemap.chromEnd - probemap.chromStart
 probemap = probemap.replace({"WARS": "WARS1"})
 probemap = probemap.set_index("gene")
 
-save_dir = Path("~/unicode_multiomics/data")
+save_dir = Path(root_dir / "unicode_multiomics/data")
 
-rnaseq_counts_coad = "~/data/gdc_coad/gene_expression/TCGA-COAD.htseq_counts.tsv.gz"
-rnaseq_counts_read = "~/data/gdc_read/gene_expression/TCGA-READ.htseq_counts.tsv.gz"
-dnameth_coadread_450k = "~/data/tcga_coadread/dna_methylation/HumanMethylation450.gz"
-mirna_coad = "~/data/gdc_coad/TCGA-COAD.mirna.tsv.gz"
-mirna_read = "~/data/gdc_read/TCGA-READ.mirna.tsv.gz"
-rppa_coadread = "~/data/tcga_coadread/RPPA_RBN.gz"
+rnaseq_counts_coad = (
+    root_dir / "data/gdc_coad/gene_expression/TCGA-COAD.htseq_counts.tsv.gz"
+)
+rnaseq_counts_read = (
+    root_dir / "data/gdc_read/gene_expression/TCGA-READ.htseq_counts.tsv.gz"
+)
+dnameth_coadread_450k = (
+    root_dir / "data/tcga_coadread/dna_methylation/HumanMethylation450.gz"
+)
+mirna_coad = root_dir / "data/gdc_coad/TCGA-COAD.mirna.tsv.gz"
+mirna_read = root_dir / "data/gdc_read/TCGA-READ.mirna.tsv.gz"
+rppa_coadread = root_dir / "data/tcga_coadread/RPPA_RBN.gz"
 
+imputer = SimpleImputer(strategy="median")
 ## Process RNA-Seq
 
-colotype_genes = pd.read_csv("~/data/colotype_gex/colotype_genes.csv", index_col=0)
+colotype_genes = pd.read_csv(
+    root_dir / "data/colotype_gex/colotype_genes.csv", index_col=0
+)
 
 rnaseq_counts_coad_df = pd.read_csv(rnaseq_counts_coad, index_col=0, sep="\t").T
 rnaseq_counts_read_df = pd.read_csv(rnaseq_counts_read, index_col=0, sep="\t").T
@@ -116,6 +128,7 @@ rnaseq_counts_coadread_colotype_df = rnaseq_counts_coadread_df.loc[
     :, colotype_genes["ensemblid"]
 ]
 rnaseq_counts_coadread_colotype_df.columns = colotype_genes["SYMBOL"]
+
 gene_lengths = probemap["length"][rnaseq_counts_coadread_colotype_df.columns]
 rnaseq_fpkm_coadread_colotype_df = get_fpkm_from_count(
     rnaseq_counts_coadread_colotype_df, gene_lengths, standardise=False
@@ -123,6 +136,9 @@ rnaseq_fpkm_coadread_colotype_df = get_fpkm_from_count(
 rnaseq_fpkm_coadread_colotype_df.index = [
     idx.rsplit("-", 1)[0] for idx in rnaseq_fpkm_coadread_colotype_df.index
 ]
+rnaseq_counts_coadread_colotype_df.to_csv(
+    save_dir / "rnaseq_counts_coadread_colotype_df.csv"
+)
 rnaseq_fpkm_coadread_colotype_df.to_csv(
     save_dir / "rnaseq_fpkm_coadread_colotype_df.csv"
 )
@@ -240,7 +256,15 @@ dnameth_literature = dna_probes_meth_genes + dna_probes
 dnameth_tcga_coadread_450_literature82 = get_dataset(
     [dnameth_coadread_450k], features_subset=dnameth_literature, standardise=False
 )
-
+dnameth_tcga_coadread_450_literature82.dropna(axis=1, how="all", inplace=True)
+if dnameth_tcga_coadread_450_literature82.isna().sum().sum() > 0.0:
+    print("Imputing DNA Methylation")
+    imputed_array = imputer.fit_transform(dnameth_tcga_coadread_450_literature82)
+    dnameth_tcga_coadread_450_literature82 = pd.DataFrame(
+        imputed_array,
+        index=dnameth_tcga_coadread_450_literature82.index,
+        columns=dnameth_tcga_coadread_450_literature82.columns,
+    )
 dnameth_tcga_coadread_450_literature82.to_csv(
     save_dir / "dnameth_tcga_coadread_450_literature82.csv"
 )
@@ -285,6 +309,7 @@ mirna_features = list(map(lambda x: ("hsa-" + x).lower(), mirna_features))
 mirna_coadread_literature30_df = get_dataset(
     [mirna_coad, mirna_read], features_subset=mirna_features, standardise=False
 )
+
 mirna_coadread_literature30_df.to_csv(save_dir / "mirna_coadread_literature30_df.csv")
 
 
@@ -330,7 +355,7 @@ merged_cologex_literature_df_innerjoin.to_csv(
 
 ## Generate Label File
 clin_labels_coadread = pd.read_csv(
-    "~/data/tinder_expts/tcga_colotype_all_labels_clean.csv",
+    root_dir / "data/tinder_expts/tcga_colotype_all_labels_clean.csv",
     index_col=0,
 )
 intersect_idx_innerjoin = list(
