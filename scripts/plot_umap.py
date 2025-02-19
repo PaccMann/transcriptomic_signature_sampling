@@ -56,7 +56,8 @@ def plot_umap(
     plot_df = plot_df.join(labels)
 
     plot_df["data"] = [
-        "synthetic" if re.search("S\d",index) is not None else "real" for index in plot_df.index
+        "synthetic" if re.search("S\d", index) is not None else "real"
+        for index in plot_df.index
     ]
 
     s = [100 if item == "synthetic" else 75 for item in plot_df["data"]]
@@ -81,7 +82,7 @@ def plot_umap(
         hue_order=hue_order,
         sizes=s,
         markers={"synthetic": ".", "real": "X"},
-        alpha=0.3,
+        alpha=0.5,
         ax=ax_,
     )
 
@@ -110,48 +111,48 @@ def plot_umap(
     #         data=plot_df[plot_df["data"]=="synthetic"],
     #         hue=hue,
     #         palette=current_palette,
-        #     style="data",
-        #     hue_order=hue_order,
-        #     sizes=s,
-        #     markers={"synthetic": ".", "real": "X"},
-        #     alpha=0.7,
-        #     ax=axin
-        # )
+    #     style="data",
+    #     hue_order=hue_order,
+    #     sizes=s,
+    #     markers={"synthetic": ".", "real": "X"},
+    #     alpha=0.7,
+    #     ax=axin
+    # )
 
-        # sns.scatterplot(
-        #     x="UMAP1",
-        #     y="UMAP2",
-        #     data=plot_df[plot_df["data"]=="real"],
-        #     hue=hue,
-        #     palette=current_palette,
-        #     style="data",
-        #     hue_order=hue_order,
-        #     sizes=s,
-        #     markers={"synthetic": ".", "real": "X"},
-        #     alpha=1.0,
-        #     ax=axin
-        # )
-    #5,10 - max
-    #2.5, 7 - 500
-    #6.5,11.5 - 5000
-        # axin.set_xlim(3,4)
-        # #10.5,12.5 - max
-        # #7.5,10 - 500
-        # #0,2.5 - 5000
-        # # axin.set_ylim(9.0,11.0)
-        # axin.set_ylim(4,5)
-        # axin.get_legend().remove()
-        # ax_.indicate_inset_zoom(axin)
-        # axin.set(xlabel=None,ylabel=None)
-        # axin.set_xticks([])
-        # axin.set_yticks([])
+    # sns.scatterplot(
+    #     x="UMAP1",
+    #     y="UMAP2",
+    #     data=plot_df[plot_df["data"]=="real"],
+    #     hue=hue,
+    #     palette=current_palette,
+    #     style="data",
+    #     hue_order=hue_order,
+    #     sizes=s,
+    #     markers={"synthetic": ".", "real": "X"},
+    #     alpha=1.0,
+    #     ax=axin
+    # )
+    # 5,10 - max
+    # 2.5, 7 - 500
+    # 6.5,11.5 - 5000
+    # axin.set_xlim(3,4)
+    # #10.5,12.5 - max
+    # #7.5,10 - 500
+    # #0,2.5 - 5000
+    # # axin.set_ylim(9.0,11.0)
+    # axin.set_ylim(4,5)
+    # axin.get_legend().remove()
+    # ax_.indicate_inset_zoom(axin)
+    # axin.set(xlabel=None,ylabel=None)
+    # axin.set_xticks([])
+    # axin.set_yticks([])
 
 
 @click.command()
 @click.option(
     "--sampling_method",
     default="gamma_poisson",
-    )
+)
 @click.option("--size", type=str)
 @click.option("--data_dir", type=click.Path(path_type=Path, exists=True))
 @click.option("--save_dir", type=click.Path(path_type=Path))
@@ -165,8 +166,9 @@ def main(sampling_method, size, data_dir, save_dir):
     hue_order = ["CMS1", "CMS2", "CMS3", "CMS4"]
     # labels = ["LumA", "LumB", "Basal", "Synthetic Data", "Real Data"]
     # hue_order = ["LumA", "LumB", "Basal"]
+
     patches = []
-    for i, colour in enumerate(current_palette[0:len(hue_order)]):
+    for i, colour in enumerate(current_palette[0 : len(hue_order)]):
         patches.append(
             mpatches.Patch(
                 color=colour,
@@ -198,11 +200,7 @@ def main(sampling_method, size, data_dir, save_dir):
     )
     # labels = ["CMS1", "CMS2", "CMS3", "CMS4", "Synthetic Data", "Real Data"]
 
-    subplot_title_map = dict(
-        zip(
-            sampling_method, "Mod. Gamma-Poisson"
-        )
-    )
+    subplot_title_map = dict(zip(sampling_method, "Mod. Gamma-Poisson"))
 
     fig, axs = plt.subplots(nrows=1, ncols=1, figsize=(18, 5), sharex=True, sharey=True)
     # for i, sampling in enumerate(sampling_methods):
@@ -226,40 +224,28 @@ def main(sampling_method, size, data_dir, save_dir):
     #         / "metabric_labels.csv",
     #         index_col=0,
     #     )
-        
+
     #     concat_df = train_df
     #     concat_labels = train_labels
-   
+
     if sampling_method == "unaugmented":
         class_size = ""
     else:
         class_size = size
     train_df = pd.read_csv(
-        data_dir
-        / sampling_method
-        / class_size
-        / "augmented_train_df_stdz.csv",
+        data_dir / class_size / "augmented_train_df_stdz.csv",
         index_col=0,
     )
     train_labels = pd.read_csv(
-        data_dir
-        / sampling_method
-        / class_size
-        / "augmented_train_labels.csv",
+        data_dir / class_size / "augmented_train_labels.csv",
         index_col=0,
     )
     test_df = pd.read_csv(
-        data_dir
-        / sampling_method
-        / class_size
-        / "real_test_df_stdz.csv",
+        data_dir / class_size / "real_test_df_stdz.csv",
         index_col=0,
     )
     test_labels = pd.read_csv(
-        data_dir
-        / sampling_method
-        / class_size
-        / "real_test_labels.csv",
+        data_dir / class_size / "real_test_labels.csv",
         index_col=0,
     )
     concat_df = pd.concat([train_df, test_df])
@@ -270,10 +256,11 @@ def main(sampling_method, size, data_dir, save_dir):
         axs,
         concat_df,
         concat_labels,
-        "cms", #cms PAM50 Pam50 + Claudin-low subtype
+        "cms",  # cms PAM50 Pam50 + Claudin-low subtype
         hue_order,
-        0.1,
+        0.1,  # 0.1 or 0.5
         5,
+        # **{"init": "pca", "n_components": 10},
     )
 
     fig.suptitle(
@@ -289,7 +276,8 @@ def main(sampling_method, size, data_dir, save_dir):
         shadow=False,
         bbox_to_anchor=(0.5, -0.1),
     )
-    fig.savefig(save_dir/f"{sampling_method}_umap.pdf", dpi=300, bbox_inches="tight")
+    save_dir = data_dir / class_size
+    fig.savefig(save_dir / "umap.pdf", dpi=300, bbox_inches="tight")
 
 
 if __name__ == "__main__":
