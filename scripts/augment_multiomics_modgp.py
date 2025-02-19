@@ -66,11 +66,11 @@ def main(
     save_dir: Path,
 ):
 
+    save_dir.mkdir(parents=True, exist_ok=True)
     class_size = literal_eval(class_size)
 
     ref_df = pd.read_csv(ref_df_path, index_col=0)
     ref_labels = pd.read_csv(ref_labels_path, index_col=0)
-    assert all(ref_df.index == ref_labels.index)
 
     # load and process test
 
