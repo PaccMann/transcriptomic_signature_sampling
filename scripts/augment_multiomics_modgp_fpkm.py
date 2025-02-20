@@ -13,7 +13,7 @@ from signature_sampling.hyperparameter_factory import SAMPLING_FACTORY
 
 warnings.filterwarnings("ignore")
 
-root_dir = Path("/Users/nja/Desktop/Sinergia")
+root_dir = Path("")
 
 probemap = pd.read_csv(
     root_dir / "data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
@@ -62,12 +62,6 @@ def get_fpkm_from_count(
 
 
 @click.command()
-# @click.option(
-#     "--cv_splits_path",
-#     required=True,
-#     type=click.Path(path_type=Path, exists=True),
-#     help="Path to json file containing cross-validation splits wrt indices.",
-# )
 @click.option(
     "--ref_df_path",
     required=True,
@@ -88,29 +82,27 @@ def get_fpkm_from_count(
 )
 @click.option("--class_size", type=str, help="Total desired size for each class.")
 @click.option("--target", type=str, help="Target variable name.")
-# @click.option(
-#     "--validation_size",
-#     type=float,
-#     help="Size of validation set when splitting train set for hyperparam tuning.",
-# )
 @click.option("--seed", type=int, help="Seed for train-test split function.")
 @click.option(
     "--save_dir",
     type=click.Path(path_type=Path),
     help="Directory in which to save the augmented data.",
 )
+@click.option(
+    "--genes_to_postprocess",
+    required=False,
+    type=click.Path(path_type=Path, exists=True),
+    help="Path to genes to subset and postprocess; columns name should be 'SYMBOL'.",
+)
 def main(
-    # cv_splits_path: Path,
     ref_df_path: Path,
     ref_labels_path: Path,
-    # probemap_path: Path,
-    # signature_path: Path,
     sampling_method: str,
     class_size: int,
     target: str,
-    # validation_size: float,
     seed: int,
     save_dir: Path,
+    genes_to_postprocess: Path,
 ):
 
     save_dir.mkdir(parents=True, exist_ok=True)
@@ -118,6 +110,9 @@ def main(
 
     ref_df = pd.read_csv(ref_df_path, index_col=0)
     ref_labels = pd.read_csv(ref_labels_path, index_col=0)
+
+    genes = pd.read_csv(genes_to_postprocess, index_col=0)
+    genes = genes["SYMBOL"]
 
     # load and process test
 
@@ -142,8 +137,12 @@ def main(
 
     assert test_df.merge(sampled_df, "inner").empty
 
-    gene_lengths = probemap["length"][sampled_df.columns]
-    sampled_df = get_fpkm_from_count(sampled_df, gene_lengths, standardise=False)
+    # apply post-processing to genes
+
+    gene_lengths = probemap["length"][sampled_df[genes].columns]
+    sampled_df[genes] = get_fpkm_from_count(
+        sampled_df[genes], gene_lengths, standardise=False
+    )
 
     scaler = StandardScaler()
     augmented_train_df_stdz = pd.DataFrame(
@@ -160,6 +159,12 @@ def main(
 
     # standardise test set based on training set
     assert all(augmented_train_df_stdz.columns == test_df.columns)
+    # apply post-processing to genes
+
+    gene_lengths = probemap["length"][test_df[genes].columns]
+    test_df[genes] = get_fpkm_from_count(
+        test_df[genes], gene_lengths, standardise=False
+    )
     test_df_stdz = pd.DataFrame(
         scaler.transform(test_df),
         columns=test_df.columns,
