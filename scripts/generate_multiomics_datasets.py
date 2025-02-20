@@ -47,54 +47,9 @@ def get_dataset(
     return df
 
 
-def get_fpkm_from_count(
-    count_df: pd.DataFrame, lengths: pd.DataFrame, standardise: bool
-):
-    def fpkm(df: pd.DataFrame, lengths: pd.DataFrame, patient_counts: np.array):
-
-        fpkm_df = df.apply(lambda x: (x * 10**9) / lengths, axis=1)
-        assert fpkm_df.iloc[0, 1] == df.iloc[0, 1] * 10**9 / lengths[1]
-        fpkm_df = fpkm_df.apply(lambda x: x / patient_counts, axis=0)
-
-        return fpkm_df
-
-    # revert from log to count
-    # count_df = count_df.applymap(lambda x: 2**x - 1)
-    # get length of genes present inn the df
-    gene_lengths = lengths[count_df.columns]
-    assert all(gene_lengths.index == count_df.columns)
-    # get patient wise sum of counts
-    patient_sum = np.sum(count_df, axis=1)
-    assert len(patient_sum) == len(count_df)
-    assert np.allclose(patient_sum[0], sum(count_df.iloc[0, :]))
-    # get fpkm df and log2 transform
-    fpkm_df = fpkm(count_df, gene_lengths, patient_sum).applymap(
-        lambda x: np.log2(x + 1)
-    )
-
-    if standardise == True:
-        scaler = StandardScaler()
-        fpkm_stdz = pd.DataFrame(
-            scaler.fit_transform(fpkm_df), columns=fpkm_df.columns, index=fpkm_df.index
-        )
-        return fpkm_stdz
-
-    return fpkm_df
-
-
 root_dir = Path("")
 
-probemap = pd.read_csv(
-    root_dir / "data/gdc_pancan/gene_expression/gencode.v22.annotation.gene.probeMap",
-    sep="\t",
-)
-# probemap.index = probemap.id
-# probemap = probemap.drop(columns='id')
-probemap["length"] = probemap.chromEnd - probemap.chromStart
-probemap = probemap.replace({"WARS": "WARS1"})
-probemap = probemap.set_index("gene")
-
-save_dir = Path(root_dir / "unicode_multiomics/data")
+save_dir = Path(root_dir / "unicode_multiomics/data/final_with_counts")
 
 rnaseq_counts_coad = (
     root_dir / "data/gdc_coad/gene_expression/TCGA-COAD.htseq_counts.tsv.gz"
@@ -129,18 +84,11 @@ rnaseq_counts_coadread_colotype_df = rnaseq_counts_coadread_df.loc[
 ]
 rnaseq_counts_coadread_colotype_df.columns = colotype_genes["SYMBOL"]
 
-gene_lengths = probemap["length"][rnaseq_counts_coadread_colotype_df.columns]
-rnaseq_fpkm_coadread_colotype_df = get_fpkm_from_count(
-    rnaseq_counts_coadread_colotype_df, gene_lengths, standardise=False
-)
-rnaseq_fpkm_coadread_colotype_df.index = [
-    idx.rsplit("-", 1)[0] for idx in rnaseq_fpkm_coadread_colotype_df.index
+rnaseq_counts_coadread_colotype_df.index = [
+    idx.rsplit("-", 1)[0] for idx in rnaseq_counts_coadread_colotype_df.index
 ]
 rnaseq_counts_coadread_colotype_df.to_csv(
     save_dir / "rnaseq_counts_coadread_colotype_df.csv"
-)
-rnaseq_fpkm_coadread_colotype_df.to_csv(
-    save_dir / "rnaseq_fpkm_coadread_colotype_df.csv"
 )
 
 ## Process RPPA
@@ -315,7 +263,7 @@ mirna_coadread_literature30_df.to_csv(save_dir / "mirna_coadread_literature30_df
 
 ## Create multi-omics dataset
 cologex_literature_files = [
-    save_dir / "rnaseq_fpkm_coadread_colotype_df.csv",
+    save_dir / "rnaseq_counts_coadread_colotype_df.csv",
     save_dir / "dnameth_tcga_coadread_450_literature82.csv",
     save_dir / "rppa_coadread_literature11_df_scaled.csv",
     save_dir / "mirna_coadread_literature30_df.csv",
@@ -330,7 +278,9 @@ merged_cologex_literature_df = df_list[0].join(df_list[1:], how="outer")
 merged_cologex_literature_df_innerjoin = df_list[0].join(df_list[1:], how="inner")
 
 merged_cologex_literature_df = merged_cologex_literature_df.dropna(axis=1, how="all")
-merged_cologex_literature_df.to_csv(save_dir / "merged_cologex_literature_df_v2.csv")
+merged_cologex_literature_df.to_csv(
+    save_dir / "merged_cologex_literature_df_v2_outerjoin.csv"
+)
 
 merged_cologex_literature_df_innerjoin = merged_cologex_literature_df_innerjoin.dropna(
     axis=1, how="all"
@@ -338,20 +288,6 @@ merged_cologex_literature_df_innerjoin = merged_cologex_literature_df_innerjoin.
 merged_cologex_literature_df_innerjoin.to_csv(
     save_dir / "merged_cologex_literature_df_v2_innerjoin.csv"
 )
-
-# ## Add WSI embeddings from VIT
-# files_to_merge = [
-#     "merged_cologex_literature_df_v2_innerjoin.csv",
-#     "merged_cologex_literature_df_v2.csv",
-# ]
-# merge_how = {files_to_merge[0]: "inner", files_to_merge[1]: "outer"}
-# vit_mean_patch = "~/data/coadread_data_clustering/vit-wsi_crc_mean_patch.csv"
-# wsi_df = pd.read_csv(vit_mean_patch, index_col=0)
-# for file in files_to_merge:
-#     filename = "vit-wsi768_unstdz_" + file.split(".")[0] + ".csv"
-#     df = pd.read_csv(save_dir / file, index_col=0)
-#     wsi_merged_df = df.join(wsi_df, how=merge_how[file])
-#     wsi_merged_df.to_csv(save_dir / filename)
 
 ## Generate Label File
 clin_labels_coadread = pd.read_csv(
