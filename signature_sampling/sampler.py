@@ -241,6 +241,11 @@ class BaseSampler:
             random.shuffle(elements)
             ref_indices = list(next(combinations(elements, r_set_size)))
             alpha, beta = estimate_gamma_parameters(ref_indices, X)
+            if any(np.isnan(beta)):
+                print("Bad combination")
+                print(target_class)
+                print(ref_indices)
+                continue
             gamma = [td.Gamma(a, b) for a, b in zip(alpha, beta)]
             mu = [g.sample() for g in gamma]
             poisson = [td.Poisson(rate) for rate in mu]
