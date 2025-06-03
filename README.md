@@ -43,7 +43,7 @@ For experiments on MLP and VAE, see [here](./scripts/)
 ## Citation
 If any part of this code is used, please cite our work:
 ```
-@article{10.1093/bioadv/vbaf124,
+@article{janakarajan2025phenotype,
     author = {Janakarajan, Nikita and Graziani, Mara and Martínez, María Rodríguez},
     title = {Phenotype Driven Data Augmentation Methods for Transcriptomic Data},
     journal = {Bioinformatics Advances},
