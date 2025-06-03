@@ -39,3 +39,20 @@ pip install --user -e .
 
 For some examples on how to use `signature_sampling` see [here](./scripts/data_gen.py).
 For experiments on MLP and VAE, see [here](./scripts/)
+
+## Citation
+If any part of this code is used, please cite our work:
+```
+@article{10.1093/bioadv/vbaf124,
+    author = {Janakarajan, Nikita and Graziani, Mara and Martínez, María Rodríguez},
+    title = {Phenotype Driven Data Augmentation Methods for Transcriptomic Data},
+    journal = {Bioinformatics Advances},
+    pages = {vbaf124},
+    year = {2025},
+    month = {05},
+    issn = {2635-0041},
+    doi = {10.1093/bioadv/vbaf124},
+    url = {https://doi.org/10.1093/bioadv/vbaf124},
+    eprint = {https://academic.oup.com/bioinformaticsadvances/advance-article-pdf/doi/10.1093/bioadv/vbaf124/63309620/vbaf124.pdf},
+}
+```
