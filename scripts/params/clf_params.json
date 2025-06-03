@@ -36,11 +36,11 @@
             "relu",
             "None"
         ],
-        "batch_size": 32,
+        "batch_size": 128,
         "lr": 0.001,
         "l2_weight": 0.01,
-        "epochs": 200,
-        "early_stopping_wait": 5,
+        "epochs": 50,
+        "early_stopping_wait": 3,
         "real_weight": 1.0,
         "synthetic_weight": 1.0
     }
