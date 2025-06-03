@@ -26,24 +26,7 @@ sampling_method_keys = {
 }
 
 colour_pal = sns.color_palette("colorblind")
-# hue_order_ = [
-#     "gamma_poisson",
-#     "global_crossover",
-#     "local_crossover",
-#     "poisson",
-#     "replacement",
-#     "smote",
-#     "unaugmented",
-# ]
-# methods = [
-#     "Mod.GP",
-#     "Inter-Class",
-#     "Intra-Class",
-#     "Mod.Poisson",
-#     "Replacement",
-#     "SMOTE",
-#     "Unaugmented",
-# ]
+
 sns.set_palette(colour_pal)
 sns.set(font="Helvetica")
 
@@ -96,7 +79,7 @@ def main(
     external_key,
     save_dir,
 ):
-    # TODO - for auto num of sublots do it based on len of class sizes
+    # TODO - for auto num of subplots do it based on len of class sizes
     classifiers = literal_eval(classifiers)
     sampling_methods = literal_eval(sampling_methods)
     methods = [sampling_method_keys[method] for method in sampling_methods]
@@ -112,10 +95,10 @@ def main(
             for clf in classifiers:
                 if method == "unaugmented":
                     result_path = result_main_dir / clf / method / "metrics.csv"
-                    # result_path = f"/Users/nja/Desktop/Sinergia/results/tinder_expts/5x5stratified_v2_check/{clf}/{method}/metrics.csv"
+
                 else:
                     result_path = result_main_dir / clf / method / size / "metrics.csv"
-                    # result_path = f"/Users/nja/Desktop/Sinergia/results/tinder_expts/5x5stratified_v2_check/{clf}/{method}/{size}/metrics.csv"
+
                 tmp_df = pd.read_csv(result_path)
                 tmp_df["method"] = [method] * len(tmp_df)
                 overall_metrics_internal_list.append(tmp_df[[internal_key, "method"]])
@@ -126,10 +109,10 @@ def main(
         sns.violinplot(data=plot_bal_acc, x="method", y=internal_key, ax=axs[i])
         # handles, labels = axs[i].get_legend_handles_labels()
         axs[i].set_xlabel("Data Augmentation Methods")
-        # axs[i].set_ylabel("Balanced Accuracy")
-        axs[i].set_ylabel("ROC-AUC Score")
+        axs[i].set_ylabel("Balanced Accuracy")
+        # axs[i].set_ylabel("ROC-AUC Score")
         axs[i].set_title(f"Class Size : {size}")
-        # axs[i].set_ylim([0.7,0.9])
+        axs[i].set_ylim([0.0, 1.0])
         axs[i].set_xticklabels(
             methods,
             rotation=45,
@@ -145,10 +128,10 @@ def main(
         sns.violinplot(data=plot_ext_bal_acc, x="method", y=external_key, ax=ext_axs[i])
         # handles, labels = ext_axs[i].get_legend_handles_labels()
         ext_axs[i].set_xlabel("Data Augmentation Methods")
-        # ext_axs[i].set_ylabel("External Balanced Accuracy")
-        ext_axs[i].set_ylabel("ROC-AUC Score")
+        ext_axs[i].set_ylabel("External Balanced Accuracy")
+        # ext_axs[i].set_ylabel("ROC-AUC Score")
         ext_axs[i].set_title(f"Class Size : {size}")
-        # ext_axs[i].set_ylim([0.3,0.9])
+        ext_axs[i].set_ylim([0.0, 1.0])
 
         ext_axs[i].set_xticklabels(
             methods, rotation=45, ha="right", rotation_mode="anchor"
@@ -174,8 +157,8 @@ def main(
 
                 w_df.loc[smethod, cmethod] = w.pvalue
 
-                sdf_ext = plot_ext_bal_acc[plot_bal_acc["method"] == smethod]
-                cdf_ext = plot_ext_bal_acc[plot_bal_acc["method"] == cmethod]
+                sdf_ext = plot_ext_bal_acc[plot_ext_bal_acc["method"] == smethod]
+                cdf_ext = plot_ext_bal_acc[plot_ext_bal_acc["method"] == cmethod]
 
                 w_ext = wilcoxon(
                     sdf_ext[external_key],
