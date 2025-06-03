@@ -15,12 +15,6 @@ warnings.filterwarnings("ignore")
 
 
 @click.command()
-# @click.option(
-#     "--cv_splits_path",
-#     required=True,
-#     type=click.Path(path_type=Path, exists=True),
-#     help="Path to json file containing cross-validation splits wrt indices.",
-# )
 @click.option(
     "--ref_df_path",
     required=True,
@@ -41,11 +35,6 @@ warnings.filterwarnings("ignore")
 )
 @click.option("--class_size", type=str, help="Total desired size for each class.")
 @click.option("--target", type=str, help="Target variable name.")
-# @click.option(
-#     "--validation_size",
-#     type=float,
-#     help="Size of validation set when splitting train set for hyperparam tuning.",
-# )
 @click.option("--seed", type=int, help="Seed for train-test split function.")
 @click.option(
     "--save_dir",
@@ -53,15 +42,11 @@ warnings.filterwarnings("ignore")
     help="Directory in which to save the augmented data.",
 )
 def main(
-    # cv_splits_path: Path,
     ref_df_path: Path,
     ref_labels_path: Path,
-    # probemap_path: Path,
-    # signature_path: Path,
     sampling_method: str,
     class_size: int,
     target: str,
-    # validation_size: float,
     seed: int,
     save_dir: Path,
 ):
