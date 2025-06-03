@@ -10,6 +10,7 @@ import pandas as pd
 from sklearn.preprocessing import StandardScaler
 
 from signature_sampling.hyperparameter_factory import SAMPLING_FACTORY
+from signature_sampling.utils import fpkm
 
 warnings.filterwarnings("ignore")
 
@@ -29,17 +30,7 @@ probemap = probemap.set_index("gene")
 def get_fpkm_from_count(
     count_df: pd.DataFrame, lengths: pd.DataFrame, standardise: bool
 ):
-    def fpkm(df: pd.DataFrame, lengths: pd.DataFrame, patient_counts: np.array):
 
-        fpkm_df = df.apply(lambda x: (x * 10**9) / lengths, axis=1)
-        assert fpkm_df.iloc[0, 1] == df.iloc[0, 1] * 10**9 / lengths[1]
-        fpkm_df = fpkm_df.apply(lambda x: x / patient_counts, axis=0)
-
-        return fpkm_df
-
-    # revert from log to count
-    # count_df = count_df.applymap(lambda x: 2**x - 1)
-    # get length of genes present inn the df
     gene_lengths = lengths[count_df.columns]
     assert all(gene_lengths.index == count_df.columns)
     # get patient wise sum of counts
