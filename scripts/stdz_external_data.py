@@ -27,16 +27,20 @@ def main(data_dir, external_name, external_xpath, external_ypath, signature_path
         )
     ext_labels = pd.read_csv(external_ypath, index_col=0)
 
+    ext_df = ext_df.loc[ext_labels.index, :]
+
     for method in sampling_methods:
         if "unaugmented" in method.stem:
             size = [""]
         else:
-            size = ["max", "500", "50"]
+            size = ["max", "500", "5000"]
         for s in size:
-            subfolders = list((method / s).rglob("**/"))
+            subfolders = list((method / s).rglob("**/scaler.pkl"))
             for folder in subfolders[1:]:
-                scaler = joblib.load(folder / "scaler.pkl")
-                stdz_external_dataset(scaler, external_name, ext_df, ext_labels, folder)
+                scaler = joblib.load(folder)
+                stdz_external_dataset(
+                    scaler, external_name, ext_df, ext_labels, folder.parent
+                )
 
 
 if __name__ == "__main__":
