@@ -20,7 +20,7 @@ class BaseSampler:
     Transcriptomic data."""
 
     def __init__(self, sampling_method: str, class_size: Any) -> None:
-        """_summary_
+        """Constructor.
 
         Args:
             sampling_method (str): Sampling method to use. One of ["poisson","gamma_poisson",
@@ -211,25 +211,6 @@ class BaseSampler:
             alpha = mean * beta
             return alpha, beta
 
-        # def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
-        #     """Function sampling the mu parameter from the Gamma-Poisson distribution.
-
-        #     Args:
-        #         mean (np.ndarray): Array of means to initialise the Gamma distribution.
-        #         var (np.ndarray): Array of standard deviations to initialise the Gamma
-        #         distribution.
-
-        #     Returns:
-        #         List: List of means to intialise the Poisson distribution.
-        #     """
-
-        # beta = mean / var
-        # if any(np.isnan(beta)):
-        # alpha = mean * beta
-        # gamma = list(map(td.Gamma, alpha, beta))
-        # mu = list(map(lambda x: x.sample(), gamma))
-        # return mu
-
         samples = []
         project = X.index[0].split("-")[0]
         r_set_size = kwargs.get("gamma_poisson_r", 5)
@@ -303,7 +284,6 @@ class BaseSampler:
 
         target_count = dict(Counter(y[target]))
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
-        # max_label_count = max(target_count.items(),key=lambda k: k[1])
         max_count = sorted_count[-1][1]
 
         sampled_df = pd.DataFrame()
@@ -394,11 +374,5 @@ class SMOTESampler(BaseSampler):
         synthetic_labels = pd.DataFrame(synthetic_samples[target])
 
         synthetic_samples = synthetic_samples.drop(columns=[target, "index"])
-
-        # merged_df = pd.concat([X, synthetic_samples])
-        # synthetic_labels
-        # merged_labels = pd.concat([y, synthetic_labels])
-
-        # return merged_df, merged_labels
 
         return synthetic_samples, synthetic_labels
