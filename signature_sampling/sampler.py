@@ -1,6 +1,7 @@
 import math
 import random
 from collections import Counter
+from itertools import combinations
 from typing import Any, Iterable, List, Tuple, Union
 
 import numpy as np
@@ -8,6 +9,7 @@ import pandas as pd
 import torch
 import torch.distributions as td
 from imblearn.over_sampling import SMOTE
+from shap import sample
 from sklearn.preprocessing import LabelEncoder
 
 from signature_sampling.utils import time_func
@@ -18,7 +20,7 @@ class BaseSampler:
     Transcriptomic data."""
 
     def __init__(self, sampling_method: str, class_size: Any) -> None:
-        """_summary_
+        """Constructor.
 
         Args:
             sampling_method (str): Sampling method to use. One of ["poisson","gamma_poisson",
@@ -197,39 +199,38 @@ class BaseSampler:
             pd.DataFrame: Dataframe of only newly generated samples from the
             Gamma-Poisson distribution
             with the specified "cms" label.
+        NOTE: alpha - shape, beta - rate
         """
 
-        def mu_gammapoisson(mean: np.ndarray, var: np.ndarray) -> List:
-            """Function sampling the mu parameter from the Gamma-Poisson distribution.
-
-            Args:
-                mean (np.ndarray): Array of means to initialise the Gamma distribution.
-                var (np.ndarray): Array of standard deviations to initialise the Gamma
-                distribution.
-
-            Returns:
-                List: List of means to intialise the Poisson distribution.
-            """
-
+        def estimate_gamma_parameters(
+            ref_indices: List[int], X: pd.DataFrame
+        ) -> Tuple[float, float]:
+            mean = X.iloc[ref_indices, :].mean().values
+            var = X.iloc[ref_indices, :].var().values
             beta = mean / var
             alpha = mean * beta
-            gamma = list(map(td.Gamma, alpha, beta))
-            mu = list(map(lambda x: x.sample(), gamma))
-            return mu
+            return alpha, beta
 
         samples = []
         project = X.index[0].split("-")[0]
         r_set_size = kwargs.get("gamma_poisson_r", 5)
-        ref_indices = self.random_combinations(
-            X.index, subset_size=r_set_size, length=length
-        )
 
-        for i in range(length):
-            mean = X.iloc[ref_indices[i], :].mean().values
-            var = X.iloc[ref_indices[i], :].var().values
-            mu = mu_gammapoisson(mean, var)
-            poisson = list(map(td.Poisson, mu))
-            samples.append(list(map(lambda x: x.sample().item(), poisson)))
+        elements = list(range(X.shape[0]))
+
+        while len(samples) < length:
+            # NOTE: a way to sample indices quickly and randomly (~19 us)
+            random.shuffle(elements)
+            ref_indices = list(next(combinations(elements, r_set_size)))
+            alpha, beta = estimate_gamma_parameters(ref_indices, X)
+            if any(np.isnan(beta)):
+                print("Bad combination")
+                print(target_class)
+                print(ref_indices)
+                continue
+            gamma = [td.Gamma(a, b) for a, b in zip(alpha, beta)]
+            mu = [g.sample() for g in gamma]
+            poisson = [td.Poisson(rate) for rate in mu]
+            samples.append([p.sample().item() for p in poisson])
 
         return pd.DataFrame(
             samples,
@@ -283,7 +284,6 @@ class BaseSampler:
 
         target_count = dict(Counter(y[target]))
         sorted_count = sorted(target_count.items(), key=lambda item: item[1])
-        # max_label_count = max(target_count.items(),key=lambda k: k[1])
         max_count = sorted_count[-1][1]
 
         sampled_df = pd.DataFrame()
@@ -294,8 +294,10 @@ class BaseSampler:
                 continue
             subset_idx = np.argwhere(y[target].values == k).flatten()
             subset = X.iloc[subset_idx, :]
-            size = max_count - v if self.class_size is None else self.class_size - v
-            # size = max_count - v if self.class_size is None else self.class_size # if you want to sample specified dset_size samples
+            # size = max_count - v if self.class_size is None else self.class_size - v
+            size = (
+                max_count - v if self.class_size is None else self.class_size
+            )  # if you want to sample specified dset_size samples
 
             new_samples = self.get_samples[self.sampling_method](
                 subset, size, k, **kwargs
@@ -372,11 +374,5 @@ class SMOTESampler(BaseSampler):
         synthetic_labels = pd.DataFrame(synthetic_samples[target])
 
         synthetic_samples = synthetic_samples.drop(columns=[target, "index"])
-
-        # merged_df = pd.concat([X, synthetic_samples])
-        # synthetic_labels
-        # merged_labels = pd.concat([y, synthetic_labels])
-
-        # return merged_df, merged_labels
 
         return synthetic_samples, synthetic_labels
