@@ -1,25 +1,27 @@
 import random
-import matplotlib.pyplot as plt
+from typing import Callable, Dict, Iterable, Tuple
+
 import matplotlib.cm as cm
-from matplotlib.colors import Colormap
+import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.colors import Colormap
 from numpy.typing import ArrayLike
 from sklearn import mixture
+
 from signature_sampling.hyperparameter_factory import (
     CLUSTERING_METHOD_FACTORY,
     CLUSTERING_METRIC_FACTORY,
 )
-from typing import Iterable, Tuple, Callable, Dict
 
 
 class Clustering:
     """Class for clustering analysis."""
 
-    def __init__(self):
-        pass
+    # def __init__(self):
+    #     pass
 
+    @staticmethod
     def compute_metric(
-        self,
         true_labels: ArrayLike,
         pred_labels: ArrayLike,
         metric: Dict = {
@@ -84,7 +86,7 @@ class Clustering:
         """
         score_list = []
         for k in n_clusters:
-            obj, pred_lbl, _ = self.clustering(data, method, k, **kwargs)
+            obj, pred_lbl, _ = Clustering.clustering(data, method, k, **kwargs)
             score_list.append(self.compute_metric(true_labels, pred_lbl, metric))
 
         scores = {key: [d.get(key) for d in score_list] for key in metric.keys()}
