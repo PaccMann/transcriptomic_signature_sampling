@@ -17,7 +17,7 @@ import sklearn.preprocessing
 import torch
 from scipy.stats import wilcoxon
 from sklearn import metrics
-from sklearn.model_selection import RepeatedStratifiedKFold, train_test_split
+from sklearn.model_selection import RepeatedStratifiedKFold
 
 from signature_sampling.vae import VAE
 
